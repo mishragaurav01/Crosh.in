@@ -157,3 +157,15 @@ Learn more about the power of Turborepo:
 - [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
 - [Configuration Options](https://turborepo.dev/docs/reference/configuration)
 - [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+
+
+
+Add identity authentication (OTP + sessions + CSRF)
+
+Implement passwordless email authentication across 5 phases:
+- Prisma schema for User, OtpCode, Session models
+- OTP generation, hashing, request/verify services
+- Server-side session management with cookie-based auth
+- Express middleware for session validation
+- Auth endpoints: /otp/request, /otp/verify, /me, /logout
+- Double-submit CSRF protection on state-changing endpoints
