@@ -51,3 +51,76 @@ model Session {
   @@unique([userId])
   @@index([userId])
 }
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  slug        String   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
+model Collection {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  slug        String   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products ProductCollection[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  slug        String   @unique
+  categoryId  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  category    Category           @relation(fields: [categoryId], references: [id])
+  variants    Variant[]
+  collections ProductCollection[]
+
+  @@index([categoryId])
+  @@index([slug])
+}
+
+model Variant {
+  id        String @id @default(cuid())
+  sku       String @unique
+  size      String
+  color     String
+  price     Int
+  stock     Int    @default(0)
+  productId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([productId])
+}
+
+model ProductCollection {
+  id           String @id @default(cuid())
+  productId    String
+  collectionId String
+
+  createdAt DateTime @default(now())
+
+  product    Product    @relation(fields: [productId], references: [id])
+  collection Collection @relation(fields: [collectionId], references: [id])
+
+  @@unique([productId, collectionId])
+  @@index([collectionId])
+}

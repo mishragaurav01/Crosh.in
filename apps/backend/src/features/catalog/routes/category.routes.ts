@@ -1,0 +1,19 @@
+import { Router } from "express";
+import type { PrismaClient } from "db/client";
+import { createCategoryController } from "../controllers/category.controller.js";
+import { requireSession } from "../../identity/middleware/session.middleware.js";
+
+export function createCategoryRoutes(prisma: PrismaClient): Router {
+  const router = Router();
+  const controller = createCategoryController(prisma);
+
+  router.use(requireSession(prisma));
+
+  router.post("/", (req, res) => controller.createHandler(req, res));
+  router.get("/", (req, res) => controller.listHandler(req, res));
+  router.get("/:id", (req, res) => controller.getHandler(req, res));
+  router.patch("/:id", (req, res) => controller.updateHandler(req, res));
+  router.delete("/:id", (req, res) => controller.deleteHandler(req, res));
+
+  return router;
+}
