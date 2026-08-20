@@ -177,3 +177,85 @@ On completion, report:
 * manual verification performed;
 * any decisions that changed during implementation;
 * any unresolved limitations.
+
+
+## Phase 10 — Admin Authorization and Deletion Hardening
+
+### User Model
+
+* [x] Add `isAdmin Boolean @default(false)` to `User`.
+* [x] Create Prisma migration.
+* [x] Apply migration in development.
+* [x] Run `bunx prisma generate`.
+* [x] Confirm existing users default to `isAdmin = false`.
+
+### Admin Authorization
+
+* [x] Implement reusable admin authorization middleware/check.
+* [x] Require a valid session before checking administrative access.
+* [x] Resolve the authenticated User server-side.
+* [x] Check `user.isAdmin === true`.
+* [x] Reject authenticated non-admin users.
+* [x] Reject unauthenticated users.
+* [x] Protect Category management endpoints.
+* [x] Protect Collection management endpoints.
+* [x] Protect Product management endpoints.
+* [x] Protect Variant management endpoints.
+* [x] Protect ProductCollection management endpoints.
+* [x] Verify admin users can access all protected operations.
+* [x] Confirm no client-provided admin flag is trusted.
+* [x] Confirm no catalog-specific authorization mechanism was introduced.
+
+### Deletion
+
+* [x] Reject Category deletion when Products exist.
+* [x] Reject Product deletion when Variants exist.
+* [x] Allow Collection deletion when memberships exist.
+* [x] Remove ProductCollection rows when deleting a Collection.
+* [x] Preserve Products when deleting a Collection.
+* [x] Ensure Product deletion never silently deletes Variants.
+* [x] Ensure Category deletion never silently deletes Products.
+* [x] Ensure ProductCollection deletion removes only the relationship.
+* [x] Add service tests for rejected Category deletion.
+* [x] Add service tests for rejected Product deletion.
+* [x] Add service/integration tests for Collection deletion.
+* [x] Verify appropriate conflict/error responses.
+
+### Slugs
+
+* [x] Confirm Category requires a client-provided slug.
+* [x] Confirm Collection requires a client-provided slug.
+* [x] Confirm Product requires a client-provided slug.
+* [x] Confirm duplicate slugs are rejected.
+* [x] Confirm no automatic slug generation exists.
+
+### Verification
+
+* [x] Admin authorization manually verified.
+* [x] Non-admin authorization manually verified.
+* [x] Unauthenticated access manually verified.
+* [x] Category deletion behavior manually verified.
+* [x] Product deletion behavior manually verified.
+* [x] Collection deletion behavior manually verified.
+* [x] Product preservation after Collection deletion verified.
+* [x] `bun test` passes.
+* [x] `tsc --noEmit` passes.
+* [x] Full diff reviewed.
+* [x] No unrelated changes introduced.
+* [x] No constitution modified without explicit approval.
+
+---
+
+## Phase 10 Reporting
+
+Report:
+
+* `isAdmin` schema change;
+* migration name;
+* authorization implementation;
+* endpoints protected;
+* deletion behavior implemented;
+* tests actually run;
+* typecheck result;
+* manual verification performed;
+* unresolved limitations, if any.

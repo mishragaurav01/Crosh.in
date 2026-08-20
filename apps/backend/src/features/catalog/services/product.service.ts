@@ -109,6 +109,16 @@ export async function deleteProduct(params: {
 
   await getProduct({ id, prisma });
 
+  const variantCount = await prisma.variant.count({ where: { productId: id } });
+  if (variantCount > 0) {
+    throw new CatalogError(
+      "PRODUCT_HAS_VARIANTS",
+      "Cannot delete product while variants reference it",
+      409,
+    );
+  }
+
+  await prisma.productCollection.deleteMany({ where: { productId: id } });
   await prisma.product.delete({ where: { id } });
 }
 

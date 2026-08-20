@@ -30,12 +30,12 @@ export async function createSession(params: {
 export async function validateSession(params: {
   sessionId: string;
   prisma: PrismaClient;
-}): Promise<{ user: { id: string; email: string }; csrfToken: string }> {
+}): Promise<{ user: { id: string; email: string; isAdmin: boolean }; csrfToken: string }> {
   const { sessionId, prisma } = params;
 
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    include: { user: { select: { id: true, email: true } } },
+    include: { user: { select: { id: true, email: true, isAdmin: true } } },
   });
 
   if (!session) {

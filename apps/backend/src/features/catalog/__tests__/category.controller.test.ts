@@ -64,6 +64,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.category as object) ?? {}),
     },
+    product: {
+      count: mock(() => Promise.resolve(0)),
+      ...((overrides.product as object) ?? {}),
+    },
   } as any;
 }
 

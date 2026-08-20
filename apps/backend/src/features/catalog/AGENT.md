@@ -469,3 +469,62 @@ details through API responses.
 * [ ] Relevant tests pass.
 * [ ] Type checking passes.
 * [ ] Full diff reviewed for unrelated changes.
+
+
+## Authorization Model
+
+Catalog management requires an authenticated session and administrative
+authorization.
+
+Administrative authorization is represented by:
+
+`User.isAdmin: boolean`
+
+Rules:
+
+* `isAdmin: true` allows catalog management operations.
+* `isAdmin: false` does not allow catalog management operations.
+* Authentication alone is insufficient.
+* Authorization must be enforced by the backend.
+* Do not introduce roles, permissions tables, or a separate authorization
+  architecture for this feature.
+* Do not trust client-provided user IDs or admin flags.
+* The authenticated user from the session is the source of identity; the
+  server-side `User.isAdmin` value is the source of administrative authority.
+
+The authorization check should be reusable by other future admin features
+without making it catalog-specific.
+
+---
+
+## Deletion Rules
+
+Catalog deletion behavior is explicit:
+
+* A Category cannot be deleted while Products reference it.
+* A Product cannot be deleted while Variants reference it.
+* A Collection may be deleted while Products belong to it.
+* Deleting a Collection removes its ProductCollection membership rows.
+* Deleting a Collection must never delete Products.
+* Deleting a Product must never silently delete Variants.
+* Deleting a Category must never silently delete Products.
+* ProductCollection deletion removes only the relationship.
+
+Rejected deletions must return the appropriate conflict response rather than
+allowing database behavior to become the API contract.
+
+---
+
+## Slugs
+
+Slugs are client-provided.
+
+The API requires a slug when creating:
+
+* Category
+* Collection
+* Product
+
+Slugs must be unique within their respective entity type.
+
+Automatic slug generation is not part of the current catalog implementation.

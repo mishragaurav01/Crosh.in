@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
-import { createCategory } from "../services/category.service.js";
-import { createCollection } from "../services/collection.service.js";
-import { createProduct } from "../services/product.service.js";
+import { createCategory, deleteCategory } from "../services/category.service.js";
+import { createCollection, deleteCollection } from "../services/collection.service.js";
+import { createProduct, deleteProduct } from "../services/product.service.js";
 import { createVariant } from "../services/variant.service.js";
 import {
   addProductToCollection,
@@ -57,6 +57,7 @@ function createBasePrisma() {
     productCollection: {
       create: mock(() => Promise.resolve(mockMembership)),
       delete: mock(() => Promise.resolve({})),
+      deleteMany: mock(() => Promise.resolve({ count: 1 })),
       findUnique: mock(() => Promise.resolve(mockMembership)),
       findMany: mock(() => Promise.resolve([mockMembership])),
       count: mock(() => Promise.resolve(1)),
@@ -410,5 +411,60 @@ describe("Integration: Unauthorized admin operation rejected", () => {
 
     expect(router).toBeDefined();
     expect(typeof router).toBe("function");
+  });
+});
+
+describe("Integration: Category deletion rejected when products exist", () => {
+  it("rejects deletion when products reference the category", async () => {
+    const prisma = createBasePrisma();
+    prisma.product.count = mock(() => Promise.resolve(2));
+
+    await expect(deleteCategory({ id: "cat-1", prisma })).rejects.toThrow(
+      expect.objectContaining({ code: "CATEGORY_HAS_PRODUCTS", statusCode: 409 }),
+    );
+  });
+
+  it("allows deletion when no products reference the category", async () => {
+    const prisma = createBasePrisma();
+    prisma.product.count = mock(() => Promise.resolve(0));
+
+    await expect(deleteCategory({ id: "cat-1", prisma })).resolves.toBeUndefined();
+  });
+});
+
+describe("Integration: Product deletion rejected when variants exist", () => {
+  it("rejects deletion when variants reference the product", async () => {
+    const prisma = createBasePrisma();
+    prisma.variant.count = mock(() => Promise.resolve(3));
+
+    await expect(deleteProduct({ id: "prod-1", prisma })).rejects.toThrow(
+      expect.objectContaining({ code: "PRODUCT_HAS_VARIANTS", statusCode: 409 }),
+    );
+  });
+
+  it("allows deletion and removes ProductCollection rows when no variants exist", async () => {
+    const prisma = createBasePrisma();
+    prisma.variant.count = mock(() => Promise.resolve(0));
+
+    await expect(deleteProduct({ id: "prod-1", prisma })).resolves.toBeUndefined();
+    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { productId: "prod-1" } });
+  });
+});
+
+describe("Integration: Collection deletion removes memberships but preserves products", () => {
+  it("deletes ProductCollection rows and the collection", async () => {
+    const prisma = createBasePrisma();
+
+    await expect(deleteCollection({ id: "col-1", prisma })).resolves.toBeUndefined();
+    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { collectionId: "col-1" } });
+    expect(prisma.collection.delete).toHaveBeenCalledWith({ where: { id: "col-1" } });
+  });
+
+  it("does not delete products when deleting a collection", async () => {
+    const prisma = createBasePrisma();
+
+    await deleteCollection({ id: "col-1", prisma });
+
+    expect(prisma.product.delete).not.toHaveBeenCalled();
   });
 });

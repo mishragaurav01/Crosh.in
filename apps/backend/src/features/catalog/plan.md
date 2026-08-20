@@ -260,3 +260,75 @@ Before implementation begins, confirm:
 
 These decisions should be recorded in the root `constitution/decisions.md`
 only if they represent durable project-wide decisions.
+
+
+## Phase 10 — Admin Authorization and Deletion Hardening
+
+### 10.1 User Authorization Model
+
+1. Add `isAdmin` to the `User` model.
+2. Use a boolean value with a safe default of `false`.
+3. Generate and apply the Prisma migration.
+4. Regenerate the Prisma client.
+5. Keep existing users non-admin by default.
+6. Do not introduce roles, permissions tables, or another authorization
+   architecture.
+
+### 10.2 Admin Authorization Middleware
+
+1. Build a reusable backend authorization middleware/check that:
+
+   * requires a valid session;
+   * resolves the authenticated User;
+   * verifies `user.isAdmin === true`;
+   * rejects non-admin users.
+2. Keep the check independent of the Catalog feature so future admin features
+   can reuse it.
+3. Apply the admin authorization check to every Catalog management endpoint.
+4. Keep `requireSession` and administrative authorization conceptually separate:
+   authentication establishes identity; `isAdmin` establishes administrative
+   authority.
+
+### 10.3 Deletion Behavior
+
+Implement and verify:
+
+* Category deletion is rejected when Products reference it.
+* Product deletion is rejected when Variants reference it.
+* Collection deletion removes its ProductCollection rows.
+* Collection deletion never deletes Products.
+* ProductCollection deletion removes only the relationship.
+
+Do not introduce cascading deletion of Products or Variants.
+
+### 10.4 Slugs
+
+Confirm that:
+
+* Category creation requires a client-provided slug.
+* Collection creation requires a client-provided slug.
+* Product creation requires a client-provided slug.
+* Slug uniqueness remains enforced.
+* No automatic slug generation is introduced.
+
+### 10.5 Verification
+
+Verify:
+
+1. Authenticated non-admin cannot create a Category.
+2. Authenticated non-admin cannot update a Product.
+3. Authenticated non-admin cannot delete a Collection.
+4. Admin can perform all Catalog management operations.
+5. Unauthenticated requests remain rejected.
+6. Category with Products cannot be deleted.
+7. Product with Variants cannot be deleted.
+8. Collection with Products can be deleted.
+9. Collection deletion removes memberships but preserves Products.
+10. Duplicate slugs remain rejected.
+
+Run:
+
+* `bun test`
+* `tsc --noEmit`
+
+Review the complete diff before considering Phase 10 complete.

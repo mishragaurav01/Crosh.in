@@ -107,3 +107,20 @@ behind a single function boundary.
 
 *(add further entries here as real decisions get made, e.g. where Address
 ultimately lives, CSRF library choice, etc.)*
+
+
+## Admin authorization model — 2026-08-20
+
+**Decision:** Administrative authorization is represented by a boolean
+`User.isAdmin` field. The field defaults to `false`.
+
+**Context:** Catalog management requires authorization beyond authentication,
+but the project does not currently need a general role or permission system.
+
+**Reasoning:** A boolean is sufficient for the current requirement and avoids
+introducing roles, permission tables, or RBAC complexity before the product
+actually needs them. The authorization check is implemented as reusable
+backend infrastructure so future administrative features can use the same
+mechanism.
+
+**Status:** active

@@ -7,6 +7,7 @@ const SESSION_COOKIE = "session_id";
 export interface SessionUser {
   id: string;
   email: string;
+  isAdmin: boolean;
 }
 
 declare global {
