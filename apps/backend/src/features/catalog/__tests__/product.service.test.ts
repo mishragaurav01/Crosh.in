@@ -36,6 +36,14 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.product as object) ?? {}),
     },
+    variant: {
+      count: mock(() => Promise.resolve(0)),
+      ...((overrides.variant as object) ?? {}),
+    },
+    productCollection: {
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+      ...((overrides.productCollection as object) ?? {}),
+    },
   } as any;
 }
 
@@ -191,5 +199,25 @@ describe("deleteProduct", () => {
     await expect(deleteProduct({ id: "missing", prisma })).rejects.toThrow(
       expect.objectContaining({ code: "PRODUCT_NOT_FOUND", statusCode: 404 }),
     );
+  });
+
+  it("throws PRODUCT_HAS_VARIANTS when variants reference the product", async () => {
+    const prisma = createMockPrisma({
+      variant: {
+        count: mock(() => Promise.resolve(3)),
+      },
+    });
+
+    await expect(deleteProduct({ id: "prod-1", prisma })).rejects.toThrow(
+      expect.objectContaining({ code: "PRODUCT_HAS_VARIANTS", statusCode: 409 }),
+    );
+  });
+
+  it("removes ProductCollection rows before deleting the product", async () => {
+    const prisma = createMockPrisma();
+    await deleteProduct({ id: "prod-1", prisma });
+
+    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { productId: "prod-1" } });
+    expect(prisma.product.delete).toHaveBeenCalledWith({ where: { id: "prod-1" } });
   });
 });

@@ -90,6 +90,7 @@ export async function deleteCollection(params: {
 
   await getCollection({ id, prisma });
 
+  await prisma.productCollection.deleteMany({ where: { collectionId: id } });
   await prisma.collection.delete({ where: { id } });
 }
 

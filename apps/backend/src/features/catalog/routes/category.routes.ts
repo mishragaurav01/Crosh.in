@@ -2,12 +2,14 @@ import { Router } from "express";
 import type { PrismaClient } from "db/client";
 import { createCategoryController } from "../controllers/category.controller.js";
 import { requireSession } from "../../identity/middleware/session.middleware.js";
+import { requireAdmin } from "../../identity/middleware/admin.middleware.js";
 
 export function createCategoryRoutes(prisma: PrismaClient): Router {
   const router = Router();
   const controller = createCategoryController(prisma);
 
   router.use(requireSession(prisma));
+  router.use(requireAdmin(prisma));
 
   router.post("/", (req, res) => controller.createHandler(req, res));
   router.get("/", (req, res) => controller.listHandler(req, res));

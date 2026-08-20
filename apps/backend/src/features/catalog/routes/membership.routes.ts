@@ -2,12 +2,14 @@ import { Router } from "express";
 import type { PrismaClient } from "db/client";
 import { createMembershipController } from "../controllers/membership.controller.js";
 import { requireSession } from "../../identity/middleware/session.middleware.js";
+import { requireAdmin } from "../../identity/middleware/admin.middleware.js";
 
 export function createMembershipRoutes(prisma: PrismaClient): Router {
   const router = Router();
   const controller = createMembershipController(prisma);
 
   router.use(requireSession(prisma));
+  router.use(requireAdmin(prisma));
 
   router.post("/:collectionId/products/:productId", (req, res) =>
     controller.addHandler(req, res),

@@ -46,6 +46,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.category as object) ?? {}),
     },
+    product: {
+      count: mock(() => Promise.resolve(0)),
+      ...((overrides.product as object) ?? {}),
+    },
   } as any;
 }
 
@@ -183,6 +187,18 @@ describe("deleteCategory", () => {
 
     await expect(deleteCategory({ id: "missing", prisma })).rejects.toThrow(
       expect.objectContaining({ code: "CATEGORY_NOT_FOUND", statusCode: 404 }),
+    );
+  });
+
+  it("throws CATEGORY_HAS_PRODUCTS when products reference the category", async () => {
+    const prisma = createMockPrisma({
+      product: {
+        count: mock(() => Promise.resolve(2)),
+      },
+    });
+
+    await expect(deleteCategory({ id: "cat-1", prisma })).rejects.toThrow(
+      expect.objectContaining({ code: "CATEGORY_HAS_PRODUCTS", statusCode: 409 }),
     );
   });
 });

@@ -45,6 +45,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.collection as object) ?? {}),
     },
+    productCollection: {
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+      ...((overrides.productCollection as object) ?? {}),
+    },
   } as any;
 }
 
@@ -173,5 +177,13 @@ describe("deleteCollection", () => {
     await expect(deleteCollection({ id: "missing", prisma })).rejects.toThrow(
       expect.objectContaining({ code: "COLLECTION_NOT_FOUND", statusCode: 404 }),
     );
+  });
+
+  it("removes ProductCollection rows before deleting the collection", async () => {
+    const prisma = createMockPrisma();
+    await deleteCollection({ id: "col-1", prisma });
+
+    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { collectionId: "col-1" } });
+    expect(prisma.collection.delete).toHaveBeenCalledWith({ where: { id: "col-1" } });
   });
 });
