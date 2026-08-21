@@ -1,4 +1,5 @@
 import express, { type ErrorRequestHandler } from "express";
+import cors from "cors";
 import { prisma } from "db/client";
 import { createAuthRoutes } from "./src/features/identity/routes/auth.routes.js";
 import { createCategoryRoutes } from "./src/features/catalog/routes/category.routes.js";
@@ -8,6 +9,24 @@ import { createVariantRoutes } from "./src/features/catalog/routes/variant.route
 import { createMembershipRoutes } from "./src/features/catalog/routes/membership.routes.js";
 
 const app = express();
+
+const allowedOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:3000")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
 

@@ -49,7 +49,6 @@ model Session {
 
   user User @relation(fields: [userId], references: [id])
 
-  @@unique([userId])
   @@index([userId])
 }
 

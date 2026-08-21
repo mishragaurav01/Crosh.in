@@ -13,6 +13,11 @@ export async function sendOtpEmail(params: {
   to: string
   code: string
 }): Promise<void> {
+  // TEMPORARY: Resend is not in service — log the OTP to the terminal instead.
+  // Restore the Resend call below once email delivery works again.
+  console.log(`[DEV OTP] ${params.to} -> code: ${params.code}`)
+  return
+
   await getResend().emails.send({
     from: process.env.EMAIL_FROM ?? 'noreply@example.com',
     to: params.to,

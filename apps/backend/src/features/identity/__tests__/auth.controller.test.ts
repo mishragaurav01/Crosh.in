@@ -46,7 +46,11 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
     },
     user: {
       upsert: mock(() =>
-        Promise.resolve({ id: "user-1", email: "test@example.com" }),
+        Promise.resolve({
+          id: "user-1",
+          email: "test@example.com",
+          isAdmin: false,
+        }),
       ),
       ...((overrides.user as object) ?? {}),
     },
@@ -164,7 +168,11 @@ describe("auth controller — verifyOtpHandler", () => {
       expect.objectContaining({
         success: true,
         data: expect.objectContaining({
-          user: expect.objectContaining({ id: "user-1", email: "test@example.com" }),
+          user: expect.objectContaining({
+            id: "user-1",
+            email: "test@example.com",
+            isAdmin: false,
+          }),
           csrfToken: expect.any(String),
         }),
       }),
@@ -257,7 +265,7 @@ describe("auth controller — meHandler", () => {
     const prisma = createMockPrisma();
     const controller = createAuthController(prisma, mockSendEmail);
     const req = createMockReq();
-    req.user = { id: "user-1", email: "test@example.com" };
+    req.user = { id: "user-1", email: "test@example.com", isAdmin: false };
     const res = createMockRes();
 
     await controller.meHandler(req, res);
@@ -266,7 +274,13 @@ describe("auth controller — meHandler", () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
-        data: { user: { id: "user-1", email: "test@example.com" } },
+        data: {
+          user: {
+            id: "user-1",
+            email: "test@example.com",
+            isAdmin: false,
+          },
+        },
       }),
     );
   });
@@ -294,7 +308,7 @@ describe("auth controller — logoutHandler", () => {
     const prisma = createMockPrisma();
     const controller = createAuthController(prisma, mockSendEmail);
     const req = createMockReq(undefined, "session_id=session-1");
-    req.user = { id: "user-1", email: "test@example.com" };
+    req.user = { id: "user-1", email: "test@example.com", isAdmin: false };
     const res = createMockRes();
 
     await controller.logoutHandler(req, res);

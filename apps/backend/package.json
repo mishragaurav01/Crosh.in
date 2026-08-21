@@ -3,14 +3,20 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/cors": "^2.8.19"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "@types/express": "^5.0.6",
+    "cors": "^2.8.6",
     "db": "*",
     "express": "^5.2.1",
     "resend": "^6.20.0",
