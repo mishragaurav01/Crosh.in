@@ -11,11 +11,11 @@ export function createVariantRoutes(prisma: PrismaClient): Router {
   router.use(requireSession(prisma));
   router.use(requireAdmin(prisma));
 
-  router.post("/", (req, res) => controller.createHandler(req, res));
-  router.get("/", (req, res) => controller.listHandler(req, res));
-  router.get("/:variantId", (req, res) => controller.getHandler(req, res));
-  router.patch("/:variantId", (req, res) => controller.updateHandler(req, res));
-  router.delete("/:variantId", (req, res) => controller.deleteHandler(req, res));
+  router.post("/:productId/variants", (req, res) => controller.createHandler(req, res));
+  router.get("/:productId/variants", (req, res) => controller.listHandler(req, res));
+  router.get("/:productId/variants/:variantId", (req, res) => controller.getHandler(req, res));
+  router.patch("/:productId/variants/:variantId", (req, res) => controller.updateHandler(req, res));
+  router.delete("/:productId/variants/:variantId", (req, res) => controller.deleteHandler(req, res));
 
   return router;
 }

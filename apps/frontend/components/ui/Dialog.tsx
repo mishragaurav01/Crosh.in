@@ -11,9 +11,9 @@ interface DialogProps {
 }
 
 const maxWidthStyles = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
+  sm: "max-w-[24rem]",
+  md: "max-w-[28rem]",
+  lg: "max-w-[32rem]",
 };
 
 export default function Dialog({

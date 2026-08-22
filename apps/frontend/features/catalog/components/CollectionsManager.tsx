@@ -192,7 +192,7 @@ export default function CollectionsManager() {
                 header: "Description",
                 render: (c) =>
                   c.description ? (
-                    <span className="block max-w-xs truncate">{c.description}</span>
+                    <span className="block max-w-[20rem] truncate">{c.description}</span>
                   ) : (
                     <span className="text-on-surface-variant">{"\u2014"}</span>
                   ),

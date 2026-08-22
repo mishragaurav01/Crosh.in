@@ -22,7 +22,7 @@ export default function EmptyState({
         {title}
       </h3>
       {description && (
-        <p className="text-body-md text-on-surface-variant mb-lg max-w-md">
+        <p className="text-body-md text-on-surface-variant mb-lg max-w-[28rem]">
           {description}
         </p>
       )}

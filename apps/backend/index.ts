@@ -34,7 +34,9 @@ app.use("/api/auth", createAuthRoutes(prisma));
 app.use("/api/admin/categories", createCategoryRoutes(prisma));
 app.use("/api/admin/collections", createCollectionRoutes(prisma));
 app.use("/api/admin/products", createProductRoutes(prisma));
-app.use("/api/admin/products/:productId/variants", createVariantRoutes(prisma));
+// Express 5 does not populate req.params from mount-path params, so variant
+// routes declare :productId themselves and share the products mount prefix.
+app.use("/api/admin/products", createVariantRoutes(prisma));
 app.use("/api/admin/collections", createMembershipRoutes(prisma));
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
