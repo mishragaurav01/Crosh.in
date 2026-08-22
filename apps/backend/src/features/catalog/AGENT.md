@@ -313,6 +313,47 @@ Collection create and update bodies accept an optional `variantIds` array:
   removes all memberships.
 * Submitted variant IDs must exist; duplicates in the array are collapsed.
 
+### Public Reads
+
+Unauthenticated, read-only storefront endpoints. GET only; no identity
+middleware is attached. The full contract lives in
+`root/feature/catalog-public-reads/AGENTS.md`.
+
+`GET /api/categories`
+
+List categories (paginated).
+
+`GET /api/products`
+
+List products (paginated). Optional `category=<categorySlug>` filter.
+Items expose computed `priceMin`/`priceMax` (null when the product has no
+variants) and a reserved `images` slot (always empty until the images phase).
+
+`GET /api/products/:slug`
+
+Retrieve a product by slug with its variants ordered by creation time
+ascending. Variants expose `available` (`stock > 0`) and never raw stock
+counts.
+
+`GET /api/collections`
+
+List collections (paginated).
+
+`GET /api/collections/:slug`
+
+Retrieve a collection by slug with member variants ordered by membership
+creation time ascending; each member carries `productId`/`productName`.
+
+Rules holding for every public response:
+
+* Payloads are explicitly DTO-mapped — no raw Prisma model passthrough.
+* Raw `stock` never appears anywhere; availability is exposed only as
+  the `available` boolean.
+* Prices leave exactly as stored (integer minor units).
+* Unknown slugs return 404 with the entity's `*_NOT_FOUND` code.
+* These endpoints must not gain write methods or identity requirements
+  without an explicit new decision.
+
 ---
 
 ## Slugs
