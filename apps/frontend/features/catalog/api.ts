@@ -4,7 +4,7 @@ import type {
   Collection,
   Product,
   Variant,
-  ProductCollection,
+  VariantCollection,
   PaginatedList,
   CategoryCreateInput,
   CategoryUpdateInput,
@@ -130,31 +130,31 @@ export async function deleteVariant(productId: string, variantId: string) {
   );
 }
 
-export async function listCollectionProducts(
+export async function listCollectionVariants(
   collectionId: string,
   page = 1,
   limit = 20,
 ) {
-  return api.get<PaginatedList<ProductCollection>>(
-    `${BASE}/collections/${collectionId}/products`,
+  return api.get<PaginatedList<VariantCollection>>(
+    `${BASE}/collections/${collectionId}/variants`,
     { page, limit },
   );
 }
 
-export async function addProductToCollection(
+export async function addVariantToCollection(
   collectionId: string,
-  productId: string,
+  variantId: string,
 ) {
-  return api.post<ProductCollection>(
-    `${BASE}/collections/${collectionId}/products/${productId}`,
+  return api.post<VariantCollection>(
+    `${BASE}/collections/${collectionId}/variants/${variantId}`,
   );
 }
 
-export async function removeProductFromCollection(
+export async function removeVariantFromCollection(
   collectionId: string,
-  productId: string,
+  variantId: string,
 ) {
   return api.delete<{ message: string }>(
-    `${BASE}/collections/${collectionId}/products/${productId}`,
+    `${BASE}/collections/${collectionId}/variants/${variantId}`,
   );
 }

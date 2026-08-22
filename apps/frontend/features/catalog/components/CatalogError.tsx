@@ -29,7 +29,7 @@ function getErrorMessage(error: ApiError | string): { title: string; message: st
     VARIANT_NOT_FOUND: "The variant was not found.",
     DUPLICATE_SLUG: "A record with this slug already exists.",
     DUPLICATE_SKU: "A variant with this SKU already exists.",
-    DUPLICATE_COLLECTION_MEMBERSHIP: "This product is already in the collection.",
+    DUPLICATE_COLLECTION_MEMBERSHIP: "This variant is already in the collection.",
     INVALID_CATEGORY: "The selected category does not exist.",
     INVALID_PRODUCT: "The selected product does not exist.",
     VALIDATION_ERROR: "Please check your input and try again.",

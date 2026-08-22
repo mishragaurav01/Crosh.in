@@ -1,9 +1,9 @@
 import type { Request, Response } from "express";
 import type { PrismaClient } from "db/client";
 import {
-  addProductToCollection,
-  removeProductFromCollection,
-  listCollectionProducts,
+  addVariantToCollection,
+  removeVariantFromCollection,
+  listCollectionVariants,
 } from "../services/membership.service.js";
 import {
   collectionMembershipParamSchema,
@@ -27,9 +27,9 @@ export function createMembershipController(prisma: PrismaClient) {
       }
 
       try {
-        const membership = await addProductToCollection({
+        const membership = await addVariantToCollection({
           collectionId: parsed.data.collectionId,
-          productId: parsed.data.productId,
+          variantId: parsed.data.variantId,
           prisma,
         });
         res.status(201).json({ success: true, data: membership });
@@ -41,7 +41,7 @@ export function createMembershipController(prisma: PrismaClient) {
           });
           return;
         }
-        console.error("[addProductToCollection]", error);
+        console.error("[addVariantToCollection]", error);
         res.status(500).json({
           success: false,
           error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" },
@@ -63,12 +63,12 @@ export function createMembershipController(prisma: PrismaClient) {
       }
 
       try {
-        await removeProductFromCollection({
+        await removeVariantFromCollection({
           collectionId: parsed.data.collectionId,
-          productId: parsed.data.productId,
+          variantId: parsed.data.variantId,
           prisma,
         });
-        res.status(200).json({ success: true, data: { message: "Product removed from collection" } });
+        res.status(200).json({ success: true, data: { message: "Variant removed from collection" } });
       } catch (error) {
         if (error instanceof CatalogError) {
           res.status(error.statusCode).json({
@@ -77,7 +77,7 @@ export function createMembershipController(prisma: PrismaClient) {
           });
           return;
         }
-        console.error("[removeProductFromCollection]", error);
+        console.error("[removeVariantFromCollection]", error);
         res.status(500).json({
           success: false,
           error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" },
@@ -85,7 +85,7 @@ export function createMembershipController(prisma: PrismaClient) {
       }
     },
 
-    async listProductsHandler(req: Request, res: Response): Promise<void> {
+    async listVariantsHandler(req: Request, res: Response): Promise<void> {
       const paramsParsed = collectionMembershipParamSchema.pick({ collectionId: true }).safeParse(req.params);
       if (!paramsParsed.success) {
         res.status(422).json({
@@ -111,7 +111,7 @@ export function createMembershipController(prisma: PrismaClient) {
       }
 
       try {
-        const result = await listCollectionProducts({
+        const result = await listCollectionVariants({
           collectionId: paramsParsed.data.collectionId,
           ...queryParsed.data,
           prisma,
@@ -125,7 +125,7 @@ export function createMembershipController(prisma: PrismaClient) {
           });
           return;
         }
-        console.error("[listCollectionProducts]", error);
+        console.error("[listCollectionVariants]", error);
         res.status(500).json({
           success: false,
           error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" },

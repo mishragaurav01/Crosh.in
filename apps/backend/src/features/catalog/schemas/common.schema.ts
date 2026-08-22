@@ -56,7 +56,7 @@ export const collectionIdParamSchema = z.object({
 
 export const collectionMembershipParamSchema = z.object({
   collectionId: z.string().min(1, "Collection ID is required"),
-  productId: z.string().min(1, "Product ID is required"),
+  variantId: z.string().min(1, "Variant ID is required"),
 });
 
 export const categoryFilterQuerySchema = z.object({

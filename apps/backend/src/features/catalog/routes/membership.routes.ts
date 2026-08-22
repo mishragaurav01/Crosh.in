@@ -11,14 +11,14 @@ export function createMembershipRoutes(prisma: PrismaClient): Router {
   router.use(requireSession(prisma));
   router.use(requireAdmin(prisma));
 
-  router.post("/:collectionId/products/:productId", (req, res) =>
+  router.post("/:collectionId/variants/:variantId", (req, res) =>
     controller.addHandler(req, res),
   );
-  router.delete("/:collectionId/products/:productId", (req, res) =>
+  router.delete("/:collectionId/variants/:variantId", (req, res) =>
     controller.removeHandler(req, res),
   );
-  router.get("/:collectionId/products", (req, res) =>
-    controller.listProductsHandler(req, res),
+  router.get("/:collectionId/variants", (req, res) =>
+    controller.listVariantsHandler(req, res),
   );
 
   return router;

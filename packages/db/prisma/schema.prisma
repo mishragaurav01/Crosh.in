@@ -73,7 +73,7 @@ model Collection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  products ProductCollection[]
+  variants VariantCollection[]
 }
 
 model Product {
@@ -86,9 +86,8 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  category    Category           @relation(fields: [categoryId], references: [id])
-  variants    Variant[]
-  collections ProductCollection[]
+  category Category @relation(fields: [categoryId], references: [id])
+  variants Variant[]
 
   @@index([categoryId])
   @@index([slug])
@@ -106,21 +105,22 @@ model Variant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product Product @relation(fields: [productId], references: [id])
+  product     Product             @relation(fields: [productId], references: [id])
+  collections VariantCollection[]
 
   @@index([productId])
 }
 
-model ProductCollection {
+model VariantCollection {
   id           String @id @default(cuid())
-  productId    String
+  variantId    String
   collectionId String
 
   createdAt DateTime @default(now())
 
-  product    Product    @relation(fields: [productId], references: [id])
+  variant    Variant    @relation(fields: [variantId], references: [id])
   collection Collection @relation(fields: [collectionId], references: [id])
 
-  @@unique([productId, collectionId])
+  @@unique([variantId, collectionId])
   @@index([collectionId])
 }

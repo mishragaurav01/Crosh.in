@@ -38,6 +38,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.variant as object) ?? {}),
     },
+    variantCollection: {
+      count: mock(() => Promise.resolve(0)),
+      ...((overrides.variantCollection as object) ?? {}),
+    },
   } as any;
 }
 
@@ -191,5 +195,18 @@ describe("deleteVariant", () => {
     ).rejects.toThrow(
       expect.objectContaining({ code: "VARIANT_NOT_FOUND", statusCode: 404 }),
     );
+  });
+
+  it("throws VARIANT_HAS_COLLECTIONS when the variant belongs to collections", async () => {
+    const prisma = createMockPrisma({
+      variantCollection: { count: mock(() => Promise.resolve(2)) },
+    });
+
+    await expect(
+      deleteVariant({ productId: "prod-1", variantId: "var-1", prisma }),
+    ).rejects.toThrow(
+      expect.objectContaining({ code: "VARIANT_HAS_COLLECTIONS", statusCode: 409 }),
+    );
+    expect(prisma.variant.delete).not.toHaveBeenCalled();
   });
 });

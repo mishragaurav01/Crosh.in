@@ -1,11 +1,11 @@
 import { describe, it, expect, mock } from "bun:test";
 import { createCategory, deleteCategory } from "../services/category.service.js";
-import { createCollection, deleteCollection } from "../services/collection.service.js";
+import { createCollection, deleteCollection, updateCollection } from "../services/collection.service.js";
 import { createProduct, deleteProduct } from "../services/product.service.js";
-import { createVariant } from "../services/variant.service.js";
+import { createVariant, deleteVariant } from "../services/variant.service.js";
 import {
-  addProductToCollection,
-  removeProductFromCollection,
+  addVariantToCollection,
+  removeVariantFromCollection,
 } from "../services/membership.service.js";
 import { listCategories } from "../services/category.service.js";
 import { listCollections } from "../services/collection.service.js";
@@ -16,12 +16,14 @@ const now = new Date();
 
 const mockCategory = { id: "cat-1", name: "Shirts", description: null, slug: "shirts", createdAt: now, updatedAt: now };
 const mockCollection = { id: "col-1", name: "Summer", description: null, slug: "summer", createdAt: now, updatedAt: now };
+const mockCollection2 = { id: "col-2", name: "Winter", description: null, slug: "winter", createdAt: now, updatedAt: now };
 const mockProduct = { id: "prod-1", name: "Tee", description: null, slug: "tee", categoryId: "cat-1", createdAt: now, updatedAt: now };
 const mockVariant = { id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", price: 2999, stock: 50, productId: "prod-1", createdAt: now, updatedAt: now };
-const mockMembership = { id: "pc-1", productId: "prod-1", collectionId: "col-1", createdAt: now };
+const mockVariant2 = { id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", price: 2999, stock: 50, productId: "prod-1", createdAt: now, updatedAt: now };
+const mockMembership = { id: "vc-1", variantId: "var-1", collectionId: "col-1", createdAt: now };
 
 function createBasePrisma() {
-  return {
+  const prisma: any = {
     category: {
       create: mock(() => Promise.resolve(mockCategory)),
       findUnique: mock(() => Promise.resolve(mockCategory)),
@@ -49,20 +51,32 @@ function createBasePrisma() {
     variant: {
       create: mock(() => Promise.resolve(mockVariant)),
       findFirst: mock(() => Promise.resolve(mockVariant)),
-      findMany: mock(() => Promise.resolve([mockVariant])),
+      findUnique: mock(() => Promise.resolve(mockVariant)),
+      findMany: mock((args: any) =>
+        Promise.resolve(
+          ((args?.where?.id?.in ?? []) as string[]).map((id) =>
+            id === "var-2" ? mockVariant2 : mockVariant,
+          ),
+        ),
+      ),
       count: mock(() => Promise.resolve(1)),
       update: mock(() => Promise.resolve(mockVariant)),
       delete: mock(() => Promise.resolve({})),
     },
-    productCollection: {
+    variantCollection: {
       create: mock(() => Promise.resolve(mockMembership)),
+      createMany: mock(() => Promise.resolve({ count: 0 })),
       delete: mock(() => Promise.resolve({})),
       deleteMany: mock(() => Promise.resolve({ count: 1 })),
       findUnique: mock(() => Promise.resolve(mockMembership)),
-      findMany: mock(() => Promise.resolve([mockMembership])),
-      count: mock(() => Promise.resolve(1)),
+      findMany: mock(() => Promise.resolve([])),
+      count: mock(() => Promise.resolve(0)),
     },
-  } as any;
+  };
+
+  prisma.$transaction = mock((fn: (tx: unknown) => unknown) => Promise.resolve(fn(prisma)));
+
+  return prisma;
 }
 
 function uniqueConstraintError() {
@@ -137,26 +151,26 @@ describe("Integration: Variant cannot reference missing product", () => {
   });
 });
 
-describe("Integration: Membership cannot reference missing product", () => {
-  it("rejects adding non-existent product to collection", async () => {
+describe("Integration: Membership cannot reference missing variant", () => {
+  it("rejects adding non-existent variant to collection", async () => {
     const prisma = createBasePrisma();
-    prisma.product.findUnique = mock(() => Promise.resolve(null));
+    prisma.variant.findUnique = mock(() => Promise.resolve(null));
 
     await expect(
-      addProductToCollection({ collectionId: "col-1", productId: "nonexistent", prisma }),
+      addVariantToCollection({ collectionId: "col-1", variantId: "nonexistent", prisma }),
     ).rejects.toThrow(
-      expect.objectContaining({ code: "PRODUCT_NOT_FOUND", statusCode: 404 }),
+      expect.objectContaining({ code: "VARIANT_NOT_FOUND", statusCode: 404 }),
     );
   });
 });
 
 describe("Integration: Membership cannot reference missing collection", () => {
-  it("rejects adding product to non-existent collection", async () => {
+  it("rejects adding variant to non-existent collection", async () => {
     const prisma = createBasePrisma();
     prisma.collection.findUnique = mock(() => Promise.resolve(null));
 
     await expect(
-      addProductToCollection({ collectionId: "nonexistent", productId: "prod-1", prisma }),
+      addVariantToCollection({ collectionId: "nonexistent", variantId: "var-1", prisma }),
     ).rejects.toThrow(
       expect.objectContaining({ code: "COLLECTION_NOT_FOUND", statusCode: 404 }),
     );
@@ -226,13 +240,94 @@ describe("Integration: Duplicate SKU rejected", () => {
 describe("Integration: Duplicate collection membership rejected", () => {
   it("throws DUPLICATE_COLLECTION_MEMBERSHIP on Prisma P2002", async () => {
     const prisma = createBasePrisma();
-    prisma.productCollection.create = mock(() => { throw uniqueConstraintError(); });
+    prisma.variantCollection.create = mock(() => { throw uniqueConstraintError(); });
 
     await expect(
-      addProductToCollection({ collectionId: "col-1", productId: "prod-1", prisma }),
+      addVariantToCollection({ collectionId: "col-1", variantId: "var-1", prisma }),
     ).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_COLLECTION_MEMBERSHIP", statusCode: 409 }),
     );
+  });
+});
+
+describe("Integration: Collection membership operates on variants", () => {
+  it("assigns all variants of a product via variantIds", async () => {
+    const prisma = createBasePrisma();
+    prisma.variantCollection.findMany = mock(() =>
+      Promise.resolve([
+        { collectionId: "col-1", variantId: "var-1" },
+        { collectionId: "col-1", variantId: "var-2" },
+      ]),
+    );
+
+    const result = await updateCollection({
+      id: "col-1",
+      variantIds: ["var-1", "var-2"],
+      prisma,
+    });
+
+    expect(prisma.variantCollection.createMany).toHaveBeenCalledWith({
+      data: [
+        { variantId: "var-1", collectionId: "col-1" },
+        { variantId: "var-2", collectionId: "col-1" },
+      ],
+    });
+    expect(result.variantIds).toEqual(["var-1", "var-2"]);
+  });
+
+  it("two variants of the same product can belong to different collections", async () => {
+    const prisma = createBasePrisma();
+    prisma.collection.findUnique = mock((args: any) =>
+      Promise.resolve(args?.where?.id === "col-2" ? mockCollection2 : mockCollection),
+    );
+
+    await updateCollection({ id: "col-1", variantIds: ["var-1"], prisma });
+    await updateCollection({ id: "col-2", variantIds: ["var-2"], prisma });
+
+    expect(prisma.variantCollection.createMany).toHaveBeenCalledWith({
+      data: [{ variantId: "var-1", collectionId: "col-1" }],
+    });
+    expect(prisma.variantCollection.createMany).toHaveBeenCalledWith({
+      data: [{ variantId: "var-2", collectionId: "col-2" }],
+    });
+  });
+
+  it("removing one variant keeps sibling variants assigned", async () => {
+    const prisma = createBasePrisma();
+    prisma.variantCollection.findMany = mock(() =>
+      Promise.resolve([{ collectionId: "col-1", variantId: "var-1" }]),
+    );
+
+    await updateCollection({ id: "col-1", variantIds: ["var-1", "var-2"], prisma });
+    const result = await updateCollection({ id: "col-1", variantIds: ["var-1"], prisma });
+
+    expect(prisma.variantCollection.createMany).toHaveBeenLastCalledWith({
+      data: [{ variantId: "var-1", collectionId: "col-1" }],
+    });
+    expect(result.variantIds).toEqual(["var-1"]);
+  });
+
+  it("rejects submitted variant IDs that do not exist without touching memberships", async () => {
+    const prisma = createBasePrisma();
+    prisma.variant.findMany = mock(() => Promise.resolve([]));
+
+    await expect(
+      updateCollection({ id: "col-1", variantIds: ["ghost"], prisma }),
+    ).rejects.toThrow(
+      expect.objectContaining({ code: "VARIANT_NOT_FOUND", statusCode: 404 }),
+    );
+    expect(prisma.variantCollection.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.variantCollection.createMany).not.toHaveBeenCalled();
+  });
+
+  it("removes a single membership without touching sibling variants", async () => {
+    const prisma = createBasePrisma();
+
+    await removeVariantFromCollection({ collectionId: "col-1", variantId: "var-1", prisma });
+
+    expect(prisma.variantCollection.delete).toHaveBeenCalledWith({
+      where: { variantId_collectionId: { variantId: "var-1", collectionId: "col-1" } },
+    });
   });
 });
 
@@ -442,29 +537,44 @@ describe("Integration: Product deletion rejected when variants exist", () => {
     );
   });
 
-  it("allows deletion and removes ProductCollection rows when no variants exist", async () => {
+  it("allows deletion when no variants exist, leaving no orphaned memberships", async () => {
     const prisma = createBasePrisma();
     prisma.variant.count = mock(() => Promise.resolve(0));
+    prisma.variantCollection.count = mock(() => Promise.resolve(0));
 
     await expect(deleteProduct({ id: "prod-1", prisma })).resolves.toBeUndefined();
-    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { productId: "prod-1" } });
+    expect(prisma.product.delete).toHaveBeenCalledWith({ where: { id: "prod-1" } });
   });
 });
 
-describe("Integration: Collection deletion removes memberships but preserves products", () => {
-  it("deletes ProductCollection rows and the collection", async () => {
+describe("Integration: Variant deletion rejected when collections exist", () => {
+  it("rejects deletion when the variant belongs to a collection", async () => {
+    const prisma = createBasePrisma();
+    prisma.variantCollection.count = mock(() => Promise.resolve(1));
+
+    await expect(
+      deleteVariant({ productId: "prod-1", variantId: "var-1", prisma }),
+    ).rejects.toThrow(
+      expect.objectContaining({ code: "VARIANT_HAS_COLLECTIONS", statusCode: 409 }),
+    );
+  });
+});
+
+describe("Integration: Collection deletion removes memberships but preserves variants", () => {
+  it("deletes VariantCollection rows and the collection", async () => {
     const prisma = createBasePrisma();
 
     await expect(deleteCollection({ id: "col-1", prisma })).resolves.toBeUndefined();
-    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { collectionId: "col-1" } });
+    expect(prisma.variantCollection.deleteMany).toHaveBeenCalledWith({ where: { collectionId: "col-1" } });
     expect(prisma.collection.delete).toHaveBeenCalledWith({ where: { id: "col-1" } });
   });
 
-  it("does not delete products when deleting a collection", async () => {
+  it("does not delete variants or products when deleting a collection", async () => {
     const prisma = createBasePrisma();
 
     await deleteCollection({ id: "col-1", prisma });
 
+    expect(prisma.variant.delete).not.toHaveBeenCalled();
     expect(prisma.product.delete).not.toHaveBeenCalled();
   });
 });

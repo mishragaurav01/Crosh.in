@@ -29,7 +29,7 @@ Catalog owns the product catalog structure:
 * products
 * product variants
 * collections
-* product-to-collection membership
+* variant-to-collection membership
 
 Catalog does not own:
 
@@ -66,8 +66,8 @@ Only authenticated users with the appropriate administrative permission may:
 * create variants
 * update variants
 * delete variants
-* add products to collections
-* remove products from collections
+* add variants to collections
+* remove variants from collections
 
 Public catalog-read behavior may be introduced separately and must not weaken
 the authorization requirements of management endpoints.
@@ -155,21 +155,23 @@ Rules:
 * `productId` is required.
 * A variant belongs to exactly one product.
 
-### ProductCollection
+### VariantCollection
 
 * `id`
-* `productId`
+* `variantId`
 * `collectionId`
 * `createdAt`
 
 Rules:
 
-* `productId` is required.
+* `variantId` is required.
 * `collectionId` is required.
-* A product may belong to many collections.
-* A collection may contain many products.
-* The `(productId, collectionId)` pair must be unique.
+* A variant may belong to many collections.
+* A collection may contain many variants.
+* The `(variantId, collectionId)` pair must be unique.
 * Creating an existing membership must not create a duplicate row.
+* A Product does not directly belong to a Collection; the Variant is the unit of
+  collection membership.
 
 ---
 
@@ -182,11 +184,11 @@ Category
           │
           └── Variant
 
-Collection
+Variant
    │
-   └── ProductCollection
+   └── VariantCollection
           │
-          └── Product
+          └── Collection
 ```
 
 The database must enforce the foreign-key relationships.
@@ -289,15 +291,27 @@ Update a variant.
 
 Delete a variant.
 
-### Product / Collection Membership
+### Variant / Collection Membership
 
-`POST /api/admin/collections/:collectionId/products/:productId`
+`POST /api/admin/collections/:collectionId/variants/:variantId`
 
-Add a product to a collection.
+Add a variant to a collection.
 
-`DELETE /api/admin/collections/:collectionId/products/:productId`
+`DELETE /api/admin/collections/:collectionId/variants/:variantId`
 
-Remove a product from a collection.
+Remove a variant from a collection.
+
+`GET /api/admin/collections/:collectionId/variants`
+
+List variants belonging to a collection (paginated).
+
+Collection create and update bodies accept an optional `variantIds` array:
+
+* On create, submitted variants become the initial membership.
+* On update, submitted `variantIds` replace the full membership set;
+  omitting the field leaves memberships unchanged, and an empty array
+  removes all memberships.
+* Submitted variant IDs must exist; duplicates in the array are collapsed.
 
 ---
 
@@ -342,8 +356,8 @@ feature.
 
 Product listing should support category filtering.
 
-Collection membership listing should support retrieving products belonging to a
-specific collection.
+Collection membership listing should support retrieving variants belonging to
+a specific collection.
 
 Do not expose arbitrary database fields as filtering parameters.
 
@@ -404,9 +418,10 @@ Feature-specific error codes should include, where applicable:
 | `VARIANT_NOT_FOUND`               | Variant does not exist                 |
 | `DUPLICATE_SLUG`                  | Slug is already in use                 |
 | `DUPLICATE_SKU`                   | SKU is already in use                  |
-| `DUPLICATE_COLLECTION_MEMBERSHIP` | Product is already in collection       |
+| `DUPLICATE_COLLECTION_MEMBERSHIP` | Variant is already in collection       |
 | `INVALID_CATEGORY`                | Product references an invalid category |
 | `INVALID_PRODUCT`                 | Variant references an invalid product  |
+| `VARIANT_HAS_COLLECTIONS`         | Variant belongs to collections and cannot be deleted |
 | `VALIDATION_ERROR`                | Request input is invalid               |
 
 Exact status-code mapping must follow the backend API constitution.
@@ -456,13 +471,13 @@ details through API responses.
 * [ ] Collection CRUD implemented.
 * [ ] Product CRUD implemented.
 * [ ] Variant CRUD implemented.
-* [ ] Product/collection membership implemented.
+* [ ] Variant/collection membership implemented.
 * [ ] Administrative authorization enforced on every management endpoint.
 * [ ] Zod validation implemented.
 * [ ] Pagination implemented for growing collections.
 * [ ] Slug uniqueness enforced.
 * [ ] SKU uniqueness enforced.
-* [ ] Product/collection membership uniqueness enforced.
+* [ ] Variant/collection membership uniqueness enforced.
 * [ ] Negative stock rejected.
 * [ ] Monetary values do not use floating-point database storage.
 * [ ] Database constraints match the feature rules.
@@ -503,12 +518,15 @@ Catalog deletion behavior is explicit:
 
 * A Category cannot be deleted while Products reference it.
 * A Product cannot be deleted while Variants reference it.
-* A Collection may be deleted while Products belong to it.
-* Deleting a Collection removes its ProductCollection membership rows.
-* Deleting a Collection must never delete Products.
+* A Variant cannot be deleted while Collections reference it.
+* A Collection may be deleted while Variants belong to it.
+* Deleting a Collection removes its VariantCollection membership rows.
+* Deleting a Collection must never delete Variants or Products.
 * Deleting a Product must never silently delete Variants.
 * Deleting a Category must never silently delete Products.
-* ProductCollection deletion removes only the relationship.
+* VariantCollection deletion removes only the relationship.
+* Because Product deletion requires zero Variants, deleting a Product can
+  never leave orphaned collection memberships.
 
 Rejected deletions must return the appropriate conflict response rather than
 allowing database behavior to become the API contract.

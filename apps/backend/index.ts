@@ -7,6 +7,11 @@ import { createCollectionRoutes } from "./src/features/catalog/routes/collection
 import { createProductRoutes } from "./src/features/catalog/routes/product.routes.js";
 import { createVariantRoutes } from "./src/features/catalog/routes/variant.routes.js";
 import { createMembershipRoutes } from "./src/features/catalog/routes/membership.routes.js";
+import {
+  createPublicCategoryRoutes,
+  createPublicProductRoutes,
+  createPublicCollectionRoutes,
+} from "./src/features/catalog/routes/public.routes.js";
 
 const app = express();
 
@@ -38,6 +43,10 @@ app.use("/api/admin/products", createProductRoutes(prisma));
 // routes declare :productId themselves and share the products mount prefix.
 app.use("/api/admin/products", createVariantRoutes(prisma));
 app.use("/api/admin/collections", createMembershipRoutes(prisma));
+
+app.use("/api/categories", createPublicCategoryRoutes(prisma));
+app.use("/api/products", createPublicProductRoutes(prisma));
+app.use("/api/collections", createPublicCollectionRoutes(prisma));
 
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error("[unhandled]", err);

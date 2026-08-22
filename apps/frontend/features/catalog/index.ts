@@ -3,7 +3,7 @@ export type {
   Collection,
   Product,
   Variant,
-  ProductCollection,
+  VariantCollection,
   PaginatedList,
   CategoryCreateInput,
   CategoryUpdateInput,

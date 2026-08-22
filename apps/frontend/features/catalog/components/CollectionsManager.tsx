@@ -138,7 +138,7 @@ export default function CollectionsManager() {
     <div>
       <PageHeader
         title="Collections"
-        description="Manage product collections"
+        description="Manage variant collections"
         actions={
           <Button onClick={openCreate}>
             <span className="material-symbols-outlined text-[18px]">add</span>
@@ -167,7 +167,7 @@ export default function CollectionsManager() {
         <EmptyState
           icon="collections"
           title="No collections yet"
-          description="Create your first collection to start grouping products."
+          description="Create your first collection to start grouping variants."
           action={
             <Button onClick={openCreate}>
               <span className="material-symbols-outlined text-[18px]">add</span>
@@ -212,7 +212,7 @@ export default function CollectionsManager() {
                       variant="outline"
                       onClick={() => router.push(`/catalog/collections/${c.id}`)}
                     >
-                      Products
+                      Variants
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
                       Edit
@@ -262,7 +262,7 @@ export default function CollectionsManager() {
         title="Delete collection"
         message={
           deleteTarget
-            ? `Delete collection "${deleteTarget.name}"? This cannot be undone. Products will not be deleted \u2014 they will only be removed from this collection.`
+            ? `Delete collection "${deleteTarget.name}"? This cannot be undone. Variants will not be deleted \u2014 they will only be removed from this collection.`
             : ""
         }
         confirmLabel="Delete"

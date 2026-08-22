@@ -1,13 +1,14 @@
 import { describe, it, expect, mock } from "bun:test";
 import {
-  addProductToCollection,
-  removeProductFromCollection,
-  listCollectionProducts,
+  addVariantToCollection,
+  removeVariantFromCollection,
+  listCollectionVariants,
+  requireVariantsExist,
 } from "../services/membership.service.js";
 
 const mockCollection = { id: "col-1", name: "Summer", slug: "summer", description: null, createdAt: new Date(), updatedAt: new Date() };
-const mockProduct = { id: "prod-1", name: "Tee", slug: "tee", categoryId: "cat-1", description: null, createdAt: new Date(), updatedAt: new Date() };
-const mockMembership = { id: "pc-1", productId: "prod-1", collectionId: "col-1", createdAt: new Date() };
+const mockVariant = { id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", price: 2999, stock: 50, productId: "prod-1", createdAt: new Date(), updatedAt: new Date() };
+const mockMembership = { id: "vc-1", variantId: "var-1", collectionId: "col-1", createdAt: new Date() };
 
 function createMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -15,33 +16,34 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       findUnique: mock(() => Promise.resolve(mockCollection)),
       ...((overrides.collection as object) ?? {}),
     },
-    product: {
-      findUnique: mock(() => Promise.resolve(mockProduct)),
-      ...((overrides.product as object) ?? {}),
+    variant: {
+      findUnique: mock(() => Promise.resolve(mockVariant)),
+      findMany: mock(() => Promise.resolve([{ id: "var-1" }])),
+      ...((overrides.variant as object) ?? {}),
     },
-    productCollection: {
+    variantCollection: {
       create: mock(() => Promise.resolve(mockMembership)),
       delete: mock(() => Promise.resolve({})),
       findUnique: mock(() => Promise.resolve(mockMembership)),
       findMany: mock(() => Promise.resolve([])),
       count: mock(() => Promise.resolve(0)),
-      ...((overrides.productCollection as object) ?? {}),
+      ...((overrides.variantCollection as object) ?? {}),
     },
   } as any;
 }
 
-describe("addProductToCollection", () => {
+describe("addVariantToCollection", () => {
   it("creates membership and returns it", async () => {
     const prisma = createMockPrisma();
-    const result = await addProductToCollection({
+    const result = await addVariantToCollection({
       collectionId: "col-1",
-      productId: "prod-1",
+      variantId: "var-1",
       prisma,
     });
 
-    expect(result.productId).toBe("prod-1");
+    expect(result.variantId).toBe("var-1");
     expect(result.collectionId).toBe("col-1");
-    expect(prisma.productCollection.create).toHaveBeenCalledTimes(1);
+    expect(prisma.variantCollection.create).toHaveBeenCalledTimes(1);
   });
 
   it("throws COLLECTION_NOT_FOUND when collection does not exist", async () => {
@@ -50,27 +52,27 @@ describe("addProductToCollection", () => {
     });
 
     await expect(
-      addProductToCollection({ collectionId: "missing", productId: "prod-1", prisma }),
+      addVariantToCollection({ collectionId: "missing", variantId: "var-1", prisma }),
     ).rejects.toThrow(
       expect.objectContaining({ code: "COLLECTION_NOT_FOUND", statusCode: 404 }),
     );
   });
 
-  it("throws PRODUCT_NOT_FOUND when product does not exist", async () => {
+  it("throws VARIANT_NOT_FOUND when variant does not exist", async () => {
     const prisma = createMockPrisma({
-      product: { findUnique: mock(() => Promise.resolve(null)) },
+      variant: { findUnique: mock(() => Promise.resolve(null)) },
     });
 
     await expect(
-      addProductToCollection({ collectionId: "col-1", productId: "missing", prisma }),
+      addVariantToCollection({ collectionId: "col-1", variantId: "missing", prisma }),
     ).rejects.toThrow(
-      expect.objectContaining({ code: "PRODUCT_NOT_FOUND", statusCode: 404 }),
+      expect.objectContaining({ code: "VARIANT_NOT_FOUND", statusCode: 404 }),
     );
   });
 
   it("throws DUPLICATE_COLLECTION_MEMBERSHIP on unique constraint violation", async () => {
     const prisma = createMockPrisma({
-      productCollection: {
+      variantCollection: {
         create: mock(() => {
           const error = new Error("Unique constraint failed") as Error & { code: string };
           error.code = "P2002";
@@ -80,44 +82,44 @@ describe("addProductToCollection", () => {
     });
 
     await expect(
-      addProductToCollection({ collectionId: "col-1", productId: "prod-1", prisma }),
+      addVariantToCollection({ collectionId: "col-1", variantId: "var-1", prisma }),
     ).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_COLLECTION_MEMBERSHIP", statusCode: 409 }),
     );
   });
 });
 
-describe("removeProductFromCollection", () => {
+describe("removeVariantFromCollection", () => {
   it("removes an existing membership", async () => {
     const prisma = createMockPrisma();
-    await removeProductFromCollection({
+    await removeVariantFromCollection({
       collectionId: "col-1",
-      productId: "prod-1",
+      variantId: "var-1",
       prisma,
     });
 
-    expect(prisma.productCollection.delete).toHaveBeenCalledWith({
-      where: { productId_collectionId: { productId: "prod-1", collectionId: "col-1" } },
+    expect(prisma.variantCollection.delete).toHaveBeenCalledWith({
+      where: { variantId_collectionId: { variantId: "var-1", collectionId: "col-1" } },
     });
   });
 
   it("throws when membership does not exist", async () => {
     const prisma = createMockPrisma({
-      productCollection: { findUnique: mock(() => Promise.resolve(null)) },
+      variantCollection: { findUnique: mock(() => Promise.resolve(null)) },
     });
 
     await expect(
-      removeProductFromCollection({ collectionId: "col-1", productId: "missing", prisma }),
+      removeVariantFromCollection({ collectionId: "col-1", variantId: "missing", prisma }),
     ).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_COLLECTION_MEMBERSHIP", statusCode: 404 }),
     );
   });
 });
 
-describe("listCollectionProducts", () => {
+describe("listCollectionVariants", () => {
   it("returns paginated results", async () => {
     const prisma = createMockPrisma();
-    const result = await listCollectionProducts({
+    const result = await listCollectionVariants({
       collectionId: "col-1",
       page: 1,
       limit: 20,
@@ -134,9 +136,39 @@ describe("listCollectionProducts", () => {
     });
 
     await expect(
-      listCollectionProducts({ collectionId: "missing", page: 1, limit: 20, prisma }),
+      listCollectionVariants({ collectionId: "missing", page: 1, limit: 20, prisma }),
     ).rejects.toThrow(
       expect.objectContaining({ code: "COLLECTION_NOT_FOUND", statusCode: 404 }),
     );
+  });
+});
+
+describe("requireVariantsExist", () => {
+  it("passes when all variants exist", async () => {
+    const prisma = createMockPrisma();
+
+    await expect(
+      requireVariantsExist({ variantIds: ["var-1"], prisma }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("throws VARIANT_NOT_FOUND when a variant is missing", async () => {
+    const prisma = createMockPrisma({
+      variant: { findMany: mock(() => Promise.resolve([])) },
+    });
+
+    await expect(
+      requireVariantsExist({ variantIds: ["missing"], prisma }),
+    ).rejects.toThrow(
+      expect.objectContaining({ code: "VARIANT_NOT_FOUND", statusCode: 404 }),
+    );
+  });
+
+  it("skips the database when no IDs are submitted", async () => {
+    const prisma = createMockPrisma();
+
+    await requireVariantsExist({ variantIds: [], prisma });
+
+    expect(prisma.variant.findMany).not.toHaveBeenCalled();
   });
 });

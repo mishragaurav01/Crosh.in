@@ -40,10 +40,6 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       count: mock(() => Promise.resolve(0)),
       ...((overrides.variant as object) ?? {}),
     },
-    productCollection: {
-      deleteMany: mock(() => Promise.resolve({ count: 0 })),
-      ...((overrides.productCollection as object) ?? {}),
-    },
   } as any;
 }
 
@@ -213,11 +209,10 @@ describe("deleteProduct", () => {
     );
   });
 
-  it("removes ProductCollection rows before deleting the product", async () => {
+  it("deletes the product when no variants reference it", async () => {
     const prisma = createMockPrisma();
     await deleteProduct({ id: "prod-1", prisma });
 
-    expect(prisma.productCollection.deleteMany).toHaveBeenCalledWith({ where: { productId: "prod-1" } });
     expect(prisma.product.delete).toHaveBeenCalledWith({ where: { id: "prod-1" } });
   });
 });

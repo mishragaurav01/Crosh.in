@@ -1,7 +1,7 @@
 import { describe, it, expect, mock } from "bun:test";
 import { createMembershipController } from "../controllers/membership.controller.js";
 
-const mockMembership = { id: "pc-1", productId: "prod-1", collectionId: "col-1", createdAt: new Date() };
+const mockMembership = { id: "vc-1", variantId: "var-1", collectionId: "col-1", createdAt: new Date() };
 
 function createMockReq(body?: unknown, params?: Record<string, string>, query?: Record<string, string>) {
   return {
@@ -36,19 +36,20 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       ),
       ...((overrides.collection as object) ?? {}),
     },
-    product: {
+    variant: {
       findUnique: mock(() =>
-        Promise.resolve({ id: "prod-1", name: "Tee", slug: "tee", categoryId: "cat-1", description: null, createdAt: new Date(), updatedAt: new Date() }),
+        Promise.resolve({ id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", price: 2999, stock: 50, productId: "prod-1", createdAt: new Date(), updatedAt: new Date() }),
       ),
-      ...((overrides.product as object) ?? {}),
+      findMany: mock(() => Promise.resolve([{ id: "var-1" }])),
+      ...((overrides.variant as object) ?? {}),
     },
-    productCollection: {
+    variantCollection: {
       create: mock(() => Promise.resolve(mockMembership)),
       delete: mock(() => Promise.resolve({})),
       findUnique: mock(() => Promise.resolve(mockMembership)),
       findMany: mock(() => Promise.resolve([])),
       count: mock(() => Promise.resolve(0)),
-      ...((overrides.productCollection as object) ?? {}),
+      ...((overrides.variantCollection as object) ?? {}),
     },
   } as any;
 }
@@ -57,7 +58,7 @@ describe("membership controller — addHandler", () => {
   it("returns 201 with created membership", async () => {
     const prisma = createMockPrisma();
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "col-1", productId: "prod-1" });
+    const req = createMockReq(undefined, { collectionId: "col-1", variantId: "var-1" });
     const res = createMockRes();
 
     await controller.addHandler(req, res);
@@ -66,7 +67,7 @@ describe("membership controller — addHandler", () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
-        data: expect.objectContaining({ productId: "prod-1", collectionId: "col-1" }),
+        data: expect.objectContaining({ variantId: "var-1", collectionId: "col-1" }),
       }),
     );
   });
@@ -76,7 +77,7 @@ describe("membership controller — addHandler", () => {
       collection: { findUnique: mock(() => Promise.resolve(null)) },
     });
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "missing", productId: "prod-1" });
+    const req = createMockReq(undefined, { collectionId: "missing", variantId: "var-1" });
     const res = createMockRes();
 
     await controller.addHandler(req, res);
@@ -90,12 +91,12 @@ describe("membership controller — addHandler", () => {
     );
   });
 
-  it("returns 404 when product does not exist", async () => {
+  it("returns 404 when variant does not exist", async () => {
     const prisma = createMockPrisma({
-      product: { findUnique: mock(() => Promise.resolve(null)) },
+      variant: { findUnique: mock(() => Promise.resolve(null)) },
     });
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "col-1", productId: "missing" });
+    const req = createMockReq(undefined, { collectionId: "col-1", variantId: "missing" });
     const res = createMockRes();
 
     await controller.addHandler(req, res);
@@ -104,14 +105,14 @@ describe("membership controller — addHandler", () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
-        error: expect.objectContaining({ code: "PRODUCT_NOT_FOUND" }),
+        error: expect.objectContaining({ code: "VARIANT_NOT_FOUND" }),
       }),
     );
   });
 
   it("returns 409 on duplicate membership", async () => {
     const prisma = createMockPrisma({
-      productCollection: {
+      variantCollection: {
         create: mock(() => {
           const error = new Error("Unique constraint failed") as Error & { code: string };
           error.code = "P2002";
@@ -120,7 +121,7 @@ describe("membership controller — addHandler", () => {
       },
     });
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "col-1", productId: "prod-1" });
+    const req = createMockReq(undefined, { collectionId: "col-1", variantId: "var-1" });
     const res = createMockRes();
 
     await controller.addHandler(req, res);
@@ -131,7 +132,7 @@ describe("membership controller — addHandler", () => {
   it("returns 422 on invalid params", async () => {
     const prisma = createMockPrisma();
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "", productId: "prod-1" });
+    const req = createMockReq(undefined, { collectionId: "", variantId: "var-1" });
     const res = createMockRes();
 
     await controller.addHandler(req, res);
@@ -144,7 +145,7 @@ describe("membership controller — removeHandler", () => {
   it("returns 200 with success message", async () => {
     const prisma = createMockPrisma();
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "col-1", productId: "prod-1" });
+    const req = createMockReq(undefined, { collectionId: "col-1", variantId: "var-1" });
     const res = createMockRes();
 
     await controller.removeHandler(req, res);
@@ -153,17 +154,17 @@ describe("membership controller — removeHandler", () => {
     expect(res.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: true,
-        data: { message: "Product removed from collection" },
+        data: { message: "Variant removed from collection" },
       }),
     );
   });
 
   it("returns 404 when membership does not exist", async () => {
     const prisma = createMockPrisma({
-      productCollection: { findUnique: mock(() => Promise.resolve(null)) },
+      variantCollection: { findUnique: mock(() => Promise.resolve(null)) },
     });
     const controller = createMembershipController(prisma);
-    const req = createMockReq(undefined, { collectionId: "col-1", productId: "missing" });
+    const req = createMockReq(undefined, { collectionId: "col-1", variantId: "missing" });
     const res = createMockRes();
 
     await controller.removeHandler(req, res);
@@ -172,14 +173,14 @@ describe("membership controller — removeHandler", () => {
   });
 });
 
-describe("membership controller — listProductsHandler", () => {
+describe("membership controller — listVariantsHandler", () => {
   it("returns 200 with paginated results", async () => {
     const prisma = createMockPrisma();
     const controller = createMembershipController(prisma);
     const req = createMockReq(undefined, { collectionId: "col-1" }, { page: "1", limit: "20" });
     const res = createMockRes();
 
-    await controller.listProductsHandler(req, res);
+    await controller.listVariantsHandler(req, res);
 
     expect(res.statusCode).toBe(200);
     expect(res.json).toHaveBeenCalledWith(
@@ -198,7 +199,7 @@ describe("membership controller — listProductsHandler", () => {
     const req = createMockReq(undefined, { collectionId: "missing" }, { page: "1", limit: "20" });
     const res = createMockRes();
 
-    await controller.listProductsHandler(req, res);
+    await controller.listVariantsHandler(req, res);
 
     expect(res.statusCode).toBe(404);
   });

@@ -114,6 +114,15 @@ export async function deleteVariant(params: {
 
   await getVariant({ productId, variantId, prisma });
 
+  const membershipCount = await prisma.variantCollection.count({ where: { variantId } });
+  if (membershipCount > 0) {
+    throw new CatalogError(
+      "VARIANT_HAS_COLLECTIONS",
+      "Cannot delete variant while it belongs to collections",
+      409,
+    );
+  }
+
   await prisma.variant.delete({ where: { id: variantId } });
 }
 
