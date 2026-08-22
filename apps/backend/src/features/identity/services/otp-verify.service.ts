@@ -10,7 +10,7 @@ export async function verifyOtp(params: {
   code: string;
   prisma: PrismaClient;
 }): Promise<{
-  user: { id: string; email: string };
+  user: { id: string; email: string; isAdmin: boolean };
   session: { sessionId: string; csrfToken: string; expiresAt: Date };
 }> {
   const { email, code, prisma } = params;
@@ -72,7 +72,7 @@ export async function verifyOtp(params: {
   const session = await createSession({ userId: user.id, prisma });
 
   return {
-    user: { id: user.id, email: user.email },
+    user: { id: user.id, email: user.email, isAdmin: user.isAdmin },
     session,
   };
 }

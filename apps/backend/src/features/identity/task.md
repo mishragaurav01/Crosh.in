@@ -70,6 +70,24 @@ passed without running it.
 - [x] `turbo lint --filter=backend` — no linter configured in backend (no eslint/biome)
 - [x] Review full diff for anything outside identity's scope — clean
 
+## Discovered Issues
+
+- [x] **`POST /otp/verify` returned 500 (`INTERNAL_ERROR`) on login.**
+      `prisma.session.create()` threw P2002 — `Session` had an undocumented
+      `@@unique([userId])` (backend `plan.md` Phase 2 only ever specified an
+      *index*), so any user with an existing session row could never log in
+      again. Surfaced on first real browser run of the verify flow.
+      **Resolution:** user chose multi-session policy. Dropped the unique
+      constraint via migration `20260820232354_allow_multiple_sessions_per_user`
+      (DROP INDEX "Session_userId_key"); `@@index([userId])` retained for
+      lookups. Required re-baselining migration history first — old history
+      was unplayable (`add_session_csrf_token` altered `Session` a day before
+      `add_identity_models` created it); replaced with
+      `20260821000000_init` generated from current schema and marked applied
+      on the dev DB (no data touched; prior migrations preserved in git and
+      temp backup). Verified: `tsc --noEmit` clean, `migrate dev` reports DB
+      in sync.
+
 ## Reporting
 
 On completion, report: what was implemented, which checks were actually run

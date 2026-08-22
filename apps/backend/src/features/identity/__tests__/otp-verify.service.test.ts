@@ -12,7 +12,11 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
     },
     user: {
       upsert: mock(() =>
-        Promise.resolve({ id: "user-1", email: "test@example.com" }),
+        Promise.resolve({
+          id: "user-1",
+          email: "test@example.com",
+          isAdmin: false,
+        }),
       ),
       ...((overrides.user as object) ?? {}),
     },
@@ -57,6 +61,7 @@ describe("verifyOtp", () => {
 
     expect(result.user.id).toBe("user-1");
     expect(result.user.email).toBe("test@example.com");
+    expect(result.user.isAdmin).toBe(false);
     expect(result.session.sessionId).toBe("session-1");
     expect(result.session.csrfToken).toEqual(expect.any(String));
     expect(result.session.csrfToken.length).toBe(64);
@@ -164,7 +169,11 @@ describe("verifyOtp", () => {
       },
       user: {
         upsert: mock(() =>
-          Promise.resolve({ id: "existing-user", email: "test@example.com" }),
+          Promise.resolve({
+            id: "existing-user",
+            email: "test@example.com",
+            isAdmin: true,
+          }),
         ),
       },
     });
@@ -176,5 +185,6 @@ describe("verifyOtp", () => {
     });
 
     expect(result.user.id).toBe("existing-user");
+    expect(result.user.isAdmin).toBe(true);
   });
 });

@@ -141,7 +141,13 @@ export function createAuthController(
 
       res.status(200).json({
         success: true,
-        data: { user: { id: req.user.id, email: req.user.email } },
+        data: {
+          user: {
+            id: req.user.id,
+            email: req.user.email,
+            isAdmin: req.user.isAdmin,
+          },
+        },
       });
     },
 
