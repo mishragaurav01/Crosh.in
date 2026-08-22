@@ -27,7 +27,7 @@ function createMockRes() {
 }
 
 function createMockPrisma(overrides: Record<string, unknown> = {}) {
-  return {
+  const prisma: any = {
     collection: {
       create: mock(() =>
         Promise.resolve({
@@ -64,11 +64,25 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.collection as object) ?? {}),
     },
-    productCollection: {
-      deleteMany: mock(() => Promise.resolve({ count: 0 })),
-      ...((overrides.productCollection as object) ?? {}),
+    variant: {
+      findMany: mock((args: any) =>
+        Promise.resolve(
+          ((args?.where?.id?.in ?? []) as string[]).map((id) => ({ id })),
+        ),
+      ),
+      ...((overrides.variant as object) ?? {}),
     },
-  } as any;
+    variantCollection: {
+      createMany: mock(() => Promise.resolve({ count: 0 })),
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+      findMany: mock(() => Promise.resolve([])),
+      ...((overrides.variantCollection as object) ?? {}),
+    },
+  };
+
+  prisma.$transaction = mock((fn: (tx: unknown) => unknown) => Promise.resolve(fn(prisma)));
+
+  return prisma;
 }
 
 describe("collection controller — createHandler", () => {

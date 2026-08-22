@@ -118,7 +118,6 @@ export async function deleteProduct(params: {
     );
   }
 
-  await prisma.productCollection.deleteMany({ where: { productId: id } });
   await prisma.product.delete({ where: { id } });
 }
 

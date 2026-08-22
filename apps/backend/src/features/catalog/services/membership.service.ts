@@ -1,34 +1,57 @@
 import type { PrismaClient } from "db/client";
 import { CatalogError } from "../types/catalog-errors.js";
 
-export async function addProductToCollection(params: {
-  collectionId: string;
-  productId: string;
+export async function requireVariantsExist(params: {
+  variantIds: string[];
   prisma: PrismaClient;
-}): Promise<{ id: string; productId: string; collectionId: string; createdAt: Date }> {
-  const { collectionId, productId, prisma } = params;
+}): Promise<void> {
+  const { variantIds, prisma } = params;
+  const uniqueIds = [...new Set(variantIds)];
 
-  const [collection, product] = await Promise.all([
+  if (uniqueIds.length === 0) {
+    return;
+  }
+
+  const found = await prisma.variant.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true },
+  });
+
+  if (found.length !== uniqueIds.length) {
+    const foundIds = new Set(found.map((variant) => variant.id));
+    const missing = uniqueIds.filter((id) => !foundIds.has(id));
+    throw new CatalogError("VARIANT_NOT_FOUND", `Variant not found: ${missing[0]}`, 404);
+  }
+}
+
+export async function addVariantToCollection(params: {
+  collectionId: string;
+  variantId: string;
+  prisma: PrismaClient;
+}): Promise<{ id: string; variantId: string; collectionId: string; createdAt: Date }> {
+  const { collectionId, variantId, prisma } = params;
+
+  const [collection, variant] = await Promise.all([
     prisma.collection.findUnique({ where: { id: collectionId } }),
-    prisma.product.findUnique({ where: { id: productId } }),
+    prisma.variant.findUnique({ where: { id: variantId } }),
   ]);
 
   if (!collection) {
     throw new CatalogError("COLLECTION_NOT_FOUND", "Collection not found", 404);
   }
-  if (!product) {
-    throw new CatalogError("PRODUCT_NOT_FOUND", "Product not found", 404);
+  if (!variant) {
+    throw new CatalogError("VARIANT_NOT_FOUND", "Variant not found", 404);
   }
 
   try {
-    return await prisma.productCollection.create({
-      data: { collectionId, productId },
+    return await prisma.variantCollection.create({
+      data: { collectionId, variantId },
     });
   } catch (error: unknown) {
     if (isPrismaUniqueConstraintError(error)) {
       throw new CatalogError(
         "DUPLICATE_COLLECTION_MEMBERSHIP",
-        "Product is already in this collection",
+        "Variant is already in this collection",
         409,
       );
     }
@@ -36,36 +59,36 @@ export async function addProductToCollection(params: {
   }
 }
 
-export async function removeProductFromCollection(params: {
+export async function removeVariantFromCollection(params: {
   collectionId: string;
-  productId: string;
+  variantId: string;
   prisma: PrismaClient;
 }): Promise<void> {
-  const { collectionId, productId, prisma } = params;
+  const { collectionId, variantId, prisma } = params;
 
-  const membership = await prisma.productCollection.findUnique({
-    where: { productId_collectionId: { productId, collectionId } },
+  const membership = await prisma.variantCollection.findUnique({
+    where: { variantId_collectionId: { variantId, collectionId } },
   });
 
   if (!membership) {
     throw new CatalogError(
       "DUPLICATE_COLLECTION_MEMBERSHIP",
-      "Product is not in this collection",
+      "Variant is not in this collection",
       404,
     );
   }
 
-  await prisma.productCollection.delete({
-    where: { productId_collectionId: { productId, collectionId } },
+  await prisma.variantCollection.delete({
+    where: { variantId_collectionId: { variantId, collectionId } },
   });
 }
 
-export async function listCollectionProducts(params: {
+export async function listCollectionVariants(params: {
   collectionId: string;
   page: number;
   limit: number;
   prisma: PrismaClient;
-}): Promise<{ data: Array<{ id: string; productId: string; collectionId: string; createdAt: Date }>; total: number; page: number; limit: number }> {
+}): Promise<{ data: Array<{ id: string; variantId: string; collectionId: string; createdAt: Date }>; total: number; page: number; limit: number }> {
   const { collectionId, page, limit, prisma } = params;
 
   const collection = await prisma.collection.findUnique({ where: { id: collectionId } });
@@ -76,13 +99,13 @@ export async function listCollectionProducts(params: {
   const skip = (page - 1) * limit;
 
   const [data, total] = await Promise.all([
-    prisma.productCollection.findMany({
+    prisma.variantCollection.findMany({
       where: { collectionId },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
     }),
-    prisma.productCollection.count({ where: { collectionId } }),
+    prisma.variantCollection.count({ where: { collectionId } }),
   ]);
 
   return { data, total, page, limit };

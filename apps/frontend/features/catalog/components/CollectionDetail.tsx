@@ -87,7 +87,11 @@ export default function CollectionDetail({ collectionId }: CollectionDetailProps
 
       <PageHeader title={collection.name} description={collection.description ?? undefined} />
 
-      <CollectionMembership collectionId={collection.id} collectionName={collection.name} />
+      <CollectionMembership
+        key={collection.id}
+        collectionId={collection.id}
+        collectionName={collection.name}
+      />
     </div>
   );
 }

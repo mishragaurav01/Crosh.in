@@ -55,6 +55,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       delete: mock(() => Promise.resolve({})),
       ...((overrides.variant as object) ?? {}),
     },
+    variantCollection: {
+      count: mock(() => Promise.resolve(0)),
+      ...((overrides.variantCollection as object) ?? {}),
+    },
   } as any;
 }
 

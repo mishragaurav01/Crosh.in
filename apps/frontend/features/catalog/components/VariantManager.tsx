@@ -11,6 +11,7 @@ import Dialog from "@/components/ui/Dialog";
 import { PageLoading } from "@/components/ui/Loading";
 import VariantForm from "./VariantForm";
 import CatalogError from "./CatalogError";
+import { formatPrice } from "../format";
 import type { Variant, VariantCreateInput, VariantUpdateInput, ApiError } from "../types";
 import {
   listVariants,
@@ -20,10 +21,6 @@ import {
 } from "../api";
 
 const PAGE_LIMIT = 20;
-
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 interface VariantManagerProps {
   productId: string;

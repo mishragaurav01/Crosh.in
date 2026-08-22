@@ -14,6 +14,7 @@ export interface Collection {
   name: string;
   description: string | null;
   slug: string;
+  variantIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -40,9 +41,9 @@ export interface Variant {
   updatedAt: string;
 }
 
-export interface ProductCollection {
+export interface VariantCollection {
   id: string;
-  productId: string;
+  variantId: string;
   collectionId: string;
   createdAt: string;
 }
@@ -70,12 +71,14 @@ export interface CollectionCreateInput {
   name: string;
   description?: string | null;
   slug: string;
+  variantIds?: string[];
 }
 
 export interface CollectionUpdateInput {
   name?: string;
   description?: string | null;
   slug?: string;
+  variantIds?: string[];
 }
 
 export interface ProductCreateInput {
