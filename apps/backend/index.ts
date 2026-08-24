@@ -2,6 +2,7 @@ import express, { type ErrorRequestHandler } from "express";
 import cors from "cors";
 import { prisma } from "db/client";
 import { createAuthRoutes } from "./src/features/identity/routes/auth.routes.js";
+import { createCartRoutes } from "./src/features/cart/routes/cart.routes.js";
 import { createCategoryRoutes } from "./src/features/catalog/routes/category.routes.js";
 import { createCollectionRoutes } from "./src/features/catalog/routes/collection.routes.js";
 import { createProductRoutes } from "./src/features/catalog/routes/product.routes.js";
@@ -37,6 +38,7 @@ app.use(
 app.use(express.json());
 
 app.use("/api/auth", createAuthRoutes(prisma));
+app.use("/api/cart", createCartRoutes(prisma));
 app.use("/api/admin/categories", createCategoryRoutes(prisma));
 app.use("/api/admin/collections", createCollectionRoutes(prisma));
 app.use("/api/admin/products", createProductRoutes(prisma));
