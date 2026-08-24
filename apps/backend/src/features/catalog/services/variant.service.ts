@@ -1,5 +1,6 @@
 import type { PrismaClient } from "db/client";
 import { CatalogError } from "../types/catalog-errors.js";
+import { deleteImagesForOwner } from "./image.service.js";
 
 export async function createVariant(params: {
   productId: string;
@@ -122,6 +123,8 @@ export async function deleteVariant(params: {
       409,
     );
   }
+
+  await deleteImagesForOwner({ ownerType: "variant", ownerId: variantId, prisma });
 
   await prisma.variant.delete({ where: { id: variantId } });
 }

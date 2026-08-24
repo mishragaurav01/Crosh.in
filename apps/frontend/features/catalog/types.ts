@@ -110,3 +110,20 @@ export interface VariantUpdateInput {
   price?: number;
   stock?: number;
 }
+
+export type ImageOwnerType = "product" | "variant" | "collection" | "category";
+
+export interface ImageOwnerRef {
+  type: ImageOwnerType;
+  id: string;
+}
+
+export interface CatalogImage {
+  id: string;
+  url: string;
+  alt: string | null;
+  sortOrder: number;
+  mimeType: string;
+  createdAt: string;
+  updatedAt: string;
+}

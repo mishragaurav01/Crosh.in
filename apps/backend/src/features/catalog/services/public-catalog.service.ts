@@ -1,20 +1,26 @@
 import type { PrismaClient } from "db/client";
 import { CatalogError } from "../types/catalog-errors.js";
+import { buildPublicUrl } from "./image.service.js";
 
 // Public DTOs are mapped explicitly so database representation never leaks:
 // raw stock stays behind `available`, and fields added to Prisma models do not
-// automatically become part of the customer-facing contract.
+// automatically become part of the customer-facing contract. Image URLs are
+// derived from the stored object key at mapping time; keys never leave the API.
+export type PublicImageSlot = {
+  url: string;
+  alt: string | null;
+};
+
 export type PublicCategory = {
   id: string;
   name: string;
   slug: string;
   description: string | null;
+  // Reserved banner slot; populated when category banners are surfaced publicly.
+  banner: PublicImageSlot | null;
 };
 
-export type PublicProductImage = {
-  url: string;
-  alt: string | null;
-};
+export type PublicProductImage = PublicImageSlot;
 
 export type PublicProductListItem = {
   id: string;
@@ -53,6 +59,12 @@ export type PublicCollectionVariant = PublicVariant & {
 
 export type PublicCollectionDetail = PublicCollection & {
   variants: PublicCollectionVariant[];
+  banner: PublicImageSlot | null;
+};
+
+type ImageRowRef = {
+  key: string;
+  alt: string | null;
 };
 
 type Paginated<T> = { data: T[]; total: number; page: number; limit: number };
@@ -75,7 +87,16 @@ export async function listPublicCategories(params: {
     prisma.category.count(),
   ]);
 
-  return { data, total, page, limit };
+  return {
+    data: data.map((category) => ({
+      ...category,
+      // Reserved banner slot; stays null until category banners are surfaced.
+      banner: null,
+    })),
+    total,
+    page,
+    limit,
+  };
 }
 
 export async function listPublicProducts(params: {
@@ -110,6 +131,10 @@ export async function listPublicProducts(params: {
         slug: true,
         description: true,
         variants: { select: { price: true }, orderBy: { createdAt: "asc" } },
+        images: {
+          select: { key: true, alt: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        },
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -125,8 +150,7 @@ export async function listPublicProducts(params: {
       slug: product.slug,
       description: product.description,
       ...priceRange(product.variants.map((variant) => variant.price)),
-      // Reserved for the images phase; always empty until that model exists.
-      images: [],
+      images: product.images.map(toPublicImage),
     })),
     total,
     page,
@@ -151,6 +175,10 @@ export async function getPublicProduct(params: {
         select: { id: true, sku: true, size: true, color: true, price: true, stock: true },
         orderBy: { createdAt: "asc" },
       },
+      images: {
+        select: { key: true, alt: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
     },
   });
 
@@ -158,11 +186,11 @@ export async function getPublicProduct(params: {
     throw new CatalogError("PRODUCT_NOT_FOUND", "Product not found", 404);
   }
 
-  const { variants, ...base } = product;
+  const { variants, images, ...base } = product;
   return {
     ...base,
     ...priceRange(variants.map((variant) => variant.price)),
-    images: [],
+    images: images.map(toPublicImage),
     variants: variants.map(toPublicVariant),
   };
 }
@@ -201,6 +229,10 @@ export async function getPublicCollection(params: {
       name: true,
       slug: true,
       description: true,
+      images: {
+        select: { key: true, alt: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      },
       variants: {
         orderBy: { createdAt: "asc" },
         select: {
@@ -224,14 +256,23 @@ export async function getPublicCollection(params: {
     throw new CatalogError("COLLECTION_NOT_FOUND", "Collection not found", 404);
   }
 
-  const { variants, ...base } = collection;
+  const { variants, images, ...base } = collection;
+  const bannerImage = images[0];
   return {
     ...base,
+    banner: bannerImage ? toPublicImage(bannerImage) : null,
     variants: variants.map((membership) => ({
       ...toPublicVariant(membership.variant),
       productId: membership.variant.product.id,
       productName: membership.variant.product.name,
     })),
+  };
+}
+
+function toPublicImage(image: ImageRowRef): PublicImageSlot {
+  return {
+    url: buildPublicUrl(image.key),
+    alt: image.alt,
   };
 }
 

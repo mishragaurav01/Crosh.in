@@ -7,6 +7,7 @@ import { createCollectionRoutes } from "./src/features/catalog/routes/collection
 import { createProductRoutes } from "./src/features/catalog/routes/product.routes.js";
 import { createVariantRoutes } from "./src/features/catalog/routes/variant.routes.js";
 import { createMembershipRoutes } from "./src/features/catalog/routes/membership.routes.js";
+import { createImageRoutes } from "./src/features/catalog/routes/image.routes.js";
 import {
   createPublicCategoryRoutes,
   createPublicProductRoutes,
@@ -43,6 +44,7 @@ app.use("/api/admin/products", createProductRoutes(prisma));
 // routes declare :productId themselves and share the products mount prefix.
 app.use("/api/admin/products", createVariantRoutes(prisma));
 app.use("/api/admin/collections", createMembershipRoutes(prisma));
+app.use("/api/admin/images", createImageRoutes(prisma));
 
 app.use("/api/categories", createPublicCategoryRoutes(prisma));
 app.use("/api/products", createPublicProductRoutes(prisma));

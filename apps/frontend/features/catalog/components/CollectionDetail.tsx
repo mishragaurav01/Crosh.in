@@ -7,6 +7,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { PageLoading } from "@/components/ui/Loading";
 import CatalogError from "./CatalogError";
 import CollectionMembership from "./CollectionMembership";
+import BannerSlot from "./BannerSlot";
 import type { Collection, ApiError } from "../types";
 import { getCollection } from "../api";
 
@@ -87,11 +88,31 @@ export default function CollectionDetail({ collectionId }: CollectionDetailProps
 
       <PageHeader title={collection.name} description={collection.description ?? undefined} />
 
-      <CollectionMembership
-        key={collection.id}
-        collectionId={collection.id}
-        collectionName={collection.name}
-      />
+      <div className="mt-lg space-y-xl">
+        <section className="space-y-sm">
+          <div>
+            <h2 className="font-headline-sm text-headline-sm text-on-surface">
+              Banner
+            </h2>
+            <p className="text-body-sm text-on-surface-variant">
+              Single image shown at the top of this collection on the
+              storefront. Replacing it swaps the current banner.
+            </p>
+          </div>
+          <BannerSlot ownerType="collection" ownerId={collection.id} />
+        </section>
+
+        <section className="space-y-sm">
+          <h2 className="font-headline-sm text-headline-sm text-on-surface">
+            Variants in this collection
+          </h2>
+          <CollectionMembership
+            key={collection.id}
+            collectionId={collection.id}
+            collectionName={collection.name}
+          />
+        </section>
+      </div>
     </div>
   );
 }

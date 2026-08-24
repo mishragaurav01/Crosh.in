@@ -48,6 +48,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
       findMany: mock(() => Promise.resolve([])),
       ...((overrides.variantCollection as object) ?? {}),
     },
+    image: {
+      findMany: mock(() => Promise.resolve([])),
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+    },
   };
 
   prisma.$transaction = mock((fn: (tx: unknown) => unknown) => Promise.resolve(fn(prisma)));
