@@ -13,6 +13,16 @@ import {
 import { requireSession } from "../../identity/middleware/session.middleware.js";
 import { requireAdmin } from "../../identity/middleware/admin.middleware.js";
 
+process.env.S3_ENDPOINT = "https://test-ref.supabase.co/storage/v1/s3";
+process.env.S3_REGION = "us-east-1";
+process.env.S3_ACCESS_KEY_ID = "test-access-key-id";
+process.env.S3_SECRET_ACCESS_KEY = "test-secret-access-key";
+process.env.S3_BUCKET = "croshfinal-dev";
+process.env.S3_PUBLIC_BASE_URL =
+  "https://test-ref.supabase.co/storage/v1/object/public/croshfinal-dev";
+
+const PUBLIC_BASE = process.env.S3_PUBLIC_BASE_URL;
+
 type Row = Record<string, any>;
 
 const T0 = new Date(1000000000000);
@@ -65,12 +75,29 @@ function createPublicPrisma() {
   const variants: Row[] = [];
   const collections: Row[] = [];
   const memberships: Row[] = [];
+  const images: Row[] = [];
 
   const byCreatedAsc = (a: Row, b: Row) => a.createdAt.getTime() - b.createdAt.getTime();
   const byCreatedDesc = (a: Row, b: Row) => b.createdAt.getTime() - a.createdAt.getTime();
+  const byImageOrder = (a: Row, b: Row) =>
+    a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime();
 
   function paginated(rows: Row[], skip?: number, take?: number): Row[] {
     return rows.slice(skip ?? 0, take !== undefined ? (skip ?? 0) + take : undefined);
+  }
+
+  function imagesFor(
+    ownerField: "productId" | "collectionId",
+    ownerId: string,
+    imageSelect?: Row,
+  ): Row[] {
+    if (!imageSelect) {
+      return [];
+    }
+    return [...images]
+      .filter((i) => i[ownerField] === ownerId)
+      .sort(byImageOrder)
+      .map((i) => project(i, imageSelect.select));
   }
 
   return {
@@ -88,6 +115,9 @@ function createPublicPrisma() {
     },
     seedMembership(row: Row) {
       memberships.push(row);
+    },
+    seedImage(row: Row) {
+      images.push(row);
     },
 
     prisma: {
@@ -113,6 +143,9 @@ function createPublicPrisma() {
               .filter((v) => v.productId === p.id)
               .sort(byCreatedAsc)
               .map((v) => project(v, select.variants.select)),
+            ...(select.images
+              ? { images: imagesFor("productId", p.id, select.images) }
+              : {}),
           }));
         },
         findUnique: async ({ where, select }: any) => {
@@ -126,6 +159,9 @@ function createPublicPrisma() {
               .filter((v) => v.productId === p.id)
               .sort(byCreatedAsc)
               .map((v) => project(v, select.variants.select)),
+            ...(select.images
+              ? { images: imagesFor("productId", p.id, select.images) }
+              : {}),
           };
         },
         count: async ({ where }: any = {}) =>
@@ -142,6 +178,9 @@ function createPublicPrisma() {
           const variantSelect = select.variants.select.variant.select;
           return {
             ...project(c, select),
+            ...(select.images
+              ? { images: imagesFor("collectionId", c.id, select.images) }
+              : {}),
             variants: [...memberships]
               .filter((m) => m.collectionId === c.id)
               .sort(byCreatedAsc)
@@ -193,12 +232,28 @@ describe("public categories list", () => {
     expect(res.json).toHaveBeenCalledWith({
       success: true,
       data: {
-        data: [{ id: "cat-1", name: "Tees", slug: "tees", description: null }],
+        data: [
+          { id: "cat-1", name: "Tees", slug: "tees", description: null, banner: null },
+        ],
         total: 1,
         page: 1,
         limit: 20,
       },
     });
+  });
+
+  it("reserves a null banner slot on every category payload", async () => {
+    const db = seedFixture();
+    db.seedImage({ id: "img-cat", key: "images/category/cat-1/banner.jpg", alt: "banner alt", sortOrder: 0, categoryId: "cat-1", createdAt: T1, updatedAt: T1 });
+    const controller = createPublicCategoryController(db.prisma);
+    const res = createMockRes();
+
+    await controller.listHandler(createMockReq(undefined, {}), res);
+
+    expect(res.statusCode).toBe(200);
+    const item = res.json.mock.calls[0][0].data.data[0];
+    // Banner stays reserved (null) until category banners are surfaced publicly.
+    expect(item.banner).toBeNull();
   });
 
   it("rejects limit above 100 with 422 VALIDATION_ERROR", async () => {
@@ -233,7 +288,7 @@ describe("public categories list", () => {
 });
 
 describe("public products list", () => {
-  it("returns 200 envelope with computed price range and reserved images slot", async () => {
+  it("returns 200 envelope with computed price range and empty gallery for products without images", async () => {
     const db = seedFixture();
     const controller = createPublicProductController(db.prisma);
     const res = createMockRes();
@@ -268,6 +323,41 @@ describe("public products list", () => {
     expect(empty.priceMin).toBeNull();
     expect(empty.priceMax).toBeNull();
     expect(empty.images).toEqual([]);
+  });
+
+  it("maps attached images to derived urls ordered by sortOrder", async () => {
+    const db = seedFixture();
+    db.seedImage({ id: "img-b", key: "images/product/prod-1/second.webp", alt: "Second", sortOrder: 1, productId: "prod-1", createdAt: T0, updatedAt: T0 });
+    db.seedImage({ id: "img-a", key: "images/product/prod-1/first.jpg", alt: null, sortOrder: 0, productId: "prod-1", createdAt: T2, updatedAt: T2 });
+    db.seedImage({ id: "img-other", key: "images/product/prod-2/other.png", alt: "Other", sortOrder: 0, productId: "prod-2", createdAt: T0, updatedAt: T0 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.listHandler(createMockReq(undefined, { page: "1", limit: "20" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const tee = res.json.mock.calls[0][0].data.data.find((p: Row) => p.slug === "tee");
+    expect(tee.images).toEqual([
+      { url: `${PUBLIC_BASE}/images/product/prod-1/first.jpg`, alt: null },
+      { url: `${PUBLIC_BASE}/images/product/prod-1/second.webp`, alt: "Second" },
+    ]);
+  });
+
+  it("never leaks storage internals in product list payloads", async () => {
+    const db = seedFixture();
+    db.seedImage({ id: "img-a", key: "images/product/prod-1/first.jpg", alt: null, sortOrder: 0, productId: "prod-1", createdAt: T0, updatedAt: T0 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.listHandler(createMockReq(undefined, {}), res);
+
+    expect(res.statusCode).toBe(200);
+    const raw = JSON.stringify(res.json.mock.calls[0][0]);
+    expect(raw).not.toContain('"key"');
+    expect(raw).not.toContain('"sortOrder"');
+    expect(raw).not.toContain('"mimeType"');
+    expect(raw).not.toContain("test-secret-access-key");
+    expect(raw).not.toContain("test-access-key-id");
   });
 
   it("filters by category slug", async () => {
@@ -333,6 +423,23 @@ describe("public product detail", () => {
     ]);
     expect(JSON.stringify(body)).not.toContain('"stock"');
     expect(JSON.stringify(body)).not.toContain("createdAt");
+  });
+
+  it("fills the product gallery with derived urls ordered by sortOrder", async () => {
+    const db = seedFixture();
+    db.seedImage({ id: "img-b", key: "images/product/prod-1/second.webp", alt: "Second", sortOrder: 1, productId: "prod-1", createdAt: T0, updatedAt: T0 });
+    db.seedImage({ id: "img-a", key: "images/product/prod-1/first.jpg", alt: null, sortOrder: 0, productId: "prod-1", createdAt: T2, updatedAt: T2 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "tee" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const data = res.json.mock.calls[0][0].data;
+    expect(data.images).toEqual([
+      { url: `${PUBLIC_BASE}/images/product/prod-1/first.jpg`, alt: null },
+      { url: `${PUBLIC_BASE}/images/product/prod-1/second.webp`, alt: "Second" },
+    ]);
   });
 
   it("returns 404 PRODUCT_NOT_FOUND for unknown slug", async () => {
@@ -404,6 +511,38 @@ describe("public collection detail", () => {
       { id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", price: 4999, available: true, productId: "prod-1", productName: "Tee" },
     ]);
     expect(JSON.stringify(body)).not.toContain('"stock"');
+  });
+
+  it("exposes the collection banner as a derived url when an image exists", async () => {
+    const db = seedFixture();
+    db.seedImage({ id: "img-col", key: "images/collection/col-1/banner.webp", alt: "Summer banner", sortOrder: 0, collectionId: "col-1", createdAt: T1, updatedAt: T1 });
+    const controller = createPublicCollectionController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "summer" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.success).toBe(true);
+    expect(body.data.banner).toEqual({
+      url: `${PUBLIC_BASE}/images/collection/col-1/banner.webp`,
+      alt: "Summer banner",
+    });
+    const raw = JSON.stringify(body);
+    expect(raw).not.toContain('"key"');
+    expect(raw).not.toContain("test-secret-access-key");
+    expect(raw).not.toContain("test-access-key-id");
+  });
+
+  it("returns a null banner when the collection has no image", async () => {
+    const db = seedFixture();
+    const controller = createPublicCollectionController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "summer" }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json.mock.calls[0][0].data.banner).toBeNull();
   });
 
   it("returns 404 COLLECTION_NOT_FOUND for unknown slug", async () => {

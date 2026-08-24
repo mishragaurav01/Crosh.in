@@ -14,6 +14,8 @@ import type {
   ProductUpdateInput,
   VariantCreateInput,
   VariantUpdateInput,
+  ImageOwnerRef,
+  CatalogImage,
 } from "./types";
 
 const BASE = "/api/admin";
@@ -157,4 +159,89 @@ export async function removeVariantFromCollection(
   return api.delete<{ message: string }>(
     `${BASE}/collections/${collectionId}/variants/${variantId}`,
   );
+}
+
+export interface ImageUploadUrlResult {
+  key: string;
+  uploadUrl: string;
+}
+
+export function createImageUploadUrl(data: {
+  filename: string;
+  contentType: string;
+  size: number;
+  owner: ImageOwnerRef;
+}) {
+  return api.post<ImageUploadUrlResult>(`${BASE}/images/upload-url`, data);
+}
+
+export function confirmImage(data: {
+  key: string;
+  alt?: string | null;
+  owner: ImageOwnerRef;
+}) {
+  return api.post<CatalogImage>(`${BASE}/images`, data);
+}
+
+export function updateImage(
+  id: string,
+  data: { alt?: string | null; sortOrder?: number },
+) {
+  return api.patch<CatalogImage>(`${BASE}/images/${id}`, data);
+}
+
+export function deleteImage(id: string) {
+  return api.delete<{ message: string }>(`${BASE}/images/${id}`);
+}
+
+export function listImagesByOwner(
+  ownerType: ImageOwnerRef["type"],
+  ownerId: string,
+) {
+  return api.get<CatalogImage[]>(
+    `${BASE}/images/${ownerType}/${ownerId}`,
+  );
+}
+
+/**
+ * PUTs raw file bytes to a presigned upload URL. Lives outside the shared
+ * `api` client because that client is JSON-only and fetch cannot report
+ * upload progress; the presigned URL must receive the exact signed
+ * Content-Type header.
+ */
+export function putFileToPresignedUrl(
+  uploadUrl: string,
+  contentType: string,
+  file: Blob,
+  onProgress?: (percent: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", contentType);
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.round((event.loaded / event.total) * 100));
+        }
+      };
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve();
+      } else {
+        reject({
+          code: "UPLOAD_FAILED",
+          message: `The file could not be uploaded to storage (status ${xhr.status}).`,
+        });
+      }
+    };
+    xhr.onerror = () => {
+      reject({
+        code: "UPLOAD_FAILED",
+        message: "The file could not be uploaded to storage.",
+      });
+    };
+    xhr.send(file);
+  });
 }

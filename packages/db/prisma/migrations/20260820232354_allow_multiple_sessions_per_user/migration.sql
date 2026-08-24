@@ -1,2 +1,2 @@
 -- DropIndex
-DROP INDEX "Session_userId_key";
+DROP INDEX IF EXISTS "Session_userId_key";

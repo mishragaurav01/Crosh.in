@@ -11,6 +11,8 @@ import Dialog from "@/components/ui/Dialog";
 import { PageLoading } from "@/components/ui/Loading";
 import VariantForm from "./VariantForm";
 import CatalogError from "./CatalogError";
+import ImageManager from "./ImageManager";
+import { IMAGE_OWNER_LIMITS } from "../images";
 import { formatPrice } from "../format";
 import type { Variant, VariantCreateInput, VariantUpdateInput, ApiError } from "../types";
 import {
@@ -39,6 +41,7 @@ export default function VariantManager({ productId }: VariantManagerProps) {
   const [formError, setFormError] = useState<ApiError | string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Variant | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [imagesFor, setImagesFor] = useState<Variant | null>(null);
   const mounted = useRef(true);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
@@ -188,6 +191,9 @@ export default function VariantManager({ productId }: VariantManagerProps) {
                 header: "",
                 render: (v) => (
                   <div className="flex justify-end gap-xs">
+                    <Button size="sm" variant="ghost" onClick={() => setImagesFor(v)}>
+                      Images
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(v)}>
                       Edit
                     </Button>
@@ -227,6 +233,21 @@ export default function VariantManager({ productId }: VariantManagerProps) {
             onCancel={() => setFormOpen(false)}
           />
         </div>
+      </Dialog>
+
+      <Dialog
+        open={!!imagesFor}
+        onClose={() => setImagesFor(null)}
+        title={imagesFor ? `Images — ${imagesFor.sku}` : "Images"}
+        maxWidth="md"
+      >
+        {imagesFor && (
+          <ImageManager
+            ownerType="variant"
+            ownerId={imagesFor.id}
+            maxImages={IMAGE_OWNER_LIMITS.variant}
+          />
+        )}
       </Dialog>
 
       <ConfirmDialog

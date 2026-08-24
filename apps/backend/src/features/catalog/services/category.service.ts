@@ -1,5 +1,6 @@
 import type { PrismaClient } from "db/client";
 import { CatalogError } from "../types/catalog-errors.js";
+import { deleteImagesForOwner } from "./image.service.js";
 
 export async function createCategory(params: {
   name: string;
@@ -98,6 +99,8 @@ export async function deleteCategory(params: {
       409,
     );
   }
+
+  await deleteImagesForOwner({ ownerType: "category", ownerId: id, prisma });
 
   await prisma.category.delete({ where: { id } });
 }

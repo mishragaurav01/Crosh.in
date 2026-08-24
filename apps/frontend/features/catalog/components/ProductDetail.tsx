@@ -7,6 +7,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import { PageLoading } from "@/components/ui/Loading";
 import CatalogError from "./CatalogError";
 import VariantManager from "./VariantManager";
+import ImageManager from "./ImageManager";
+import { IMAGE_OWNER_LIMITS } from "../images";
 import type { Product, Category, ApiError } from "../types";
 import { getProduct, listCategories } from "../api";
 
@@ -96,7 +98,31 @@ export default function ProductDetail({ productId }: ProductDetailProps) {
         }
       />
 
-      <VariantManager productId={product.id} />
+      <div className="mt-lg space-y-xl">
+        <section className="space-y-sm">
+          <div>
+            <h2 className="font-headline-sm text-headline-sm text-on-surface">
+              Images
+            </h2>
+            <p className="text-body-sm text-on-surface-variant">
+              Up to {IMAGE_OWNER_LIMITS.product} images. The first image is the
+              storefront&apos;s primary product image.
+            </p>
+          </div>
+          <ImageManager
+            ownerType="product"
+            ownerId={product.id}
+            maxImages={IMAGE_OWNER_LIMITS.product}
+          />
+        </section>
+
+        <section className="space-y-sm">
+          <h2 className="font-headline-sm text-headline-sm text-on-surface">
+            Variants
+          </h2>
+          <VariantManager productId={product.id} />
+        </section>
+      </div>
     </div>
   );
 }

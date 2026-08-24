@@ -44,8 +44,11 @@ Pagination reuses `paginationQuerySchema` (page ≥ 1, limit ≤ 100, default 20
 Paginated list.
 
 ```json
-{ "id": "...", "name": "...", "slug": "...", "description": null }
+{ "id": "...", "name": "...", "slug": "...", "description": null, "banner": null }
 ```
+
+Each item reserves a `banner: { url, alt } | null` slot; it is always null
+until category banners are surfaced publicly.
 
 ### Products
 
@@ -61,14 +64,14 @@ Paginated list. `category` filters by category slug and is optional.
   "description": null,
   "priceMin": 2999,
   "priceMax": 4999,
-  "images": []
+  "images": [{ "url": "https://cdn.example/images/product/<id>/<key>.webp", "alt": "Front" }]
 }
 ```
 
 `priceMin`/`priceMax` are computed across the product's variants in integer
 minor units (cents). Products with zero variants yield `null` for both.
-`images` is reserved for the images phase and returns `[]` until that model
-exists.
+`images` maps the product's attached images as `{ url, alt }[]` ordered by
+`sortOrder` then creation time; products without images yield `[]`.
 
 `GET /api/products/:slug`
 
@@ -79,7 +82,7 @@ Product detail. Same base shape as a list item plus:
   "variants": [
     { "id": "...", "sku": "...", "size": "S", "color": "Black", "price": 2999, "available": true }
   ],
-  "images": []
+  "images": [{ "url": "https://cdn.example/images/product/<id>/<key>.webp", "alt": "Front" }]
 }
 ```
 
@@ -93,15 +96,21 @@ Paginated list: `{ id, name, slug, description }`.
 
 `GET /api/collections/:slug`
 
-Collection detail: list shape plus its member variants, each as:
+Collection detail: list shape plus its banner and member variants:
 
 ```json
-{ "id": "...", "sku": "...", "size": "...", "color": "...", "price": 2999,
-  "available": true, "productId": "...", "productName": "..." }
+{
+  "banner": { "url": "https://cdn.example/images/collection/<id>/<key>.webp", "alt": "Banner" },
+  "variants": [
+    { "id": "...", "sku": "...", "size": "...", "color": "...", "price": 2999,
+      "available": true, "productId": "...", "productName": "..." }
+  ]
+}
 ```
 
+`banner` is `{ url, alt } | null` (null when no banner image is attached).
 `productId`/`productName` let consumers group variants under products.
-Ordered by membership creation time ascending.
+Variants are ordered by membership creation time ascending.
 
 ---
 
@@ -116,6 +125,10 @@ Ordered by membership creation time ascending.
   internal cuids are never accepted by public routes.
 * No field selection shortcuts: public responses use explicit DTO mapping, not
   raw Prisma model passthrough.
+* Only derived image URLs leave the system: `{ url, alt }` values are built at
+  DTO-mapping time from the configured public base. Object keys, bucket names,
+  endpoints, credentials, and signing material never appear in any public
+  response.
 
 ---
 
@@ -139,7 +152,9 @@ Ordered by membership creation time ascending.
 * Rate limiting (no middleware exists repo-wide yet; noted as future hardening)
 * Search, sorting beyond defaults
 * Caching / ETags
-* Image upload or storage (separate phase; only the `images` DTO slot exists)
+* Image upload/storage administration (admin-only surface owned by the
+  catalog-images feature; these endpoints only map attached images into DTOs)
+* Category banner population (slot reserved, filled by a later decision)
 * Frontend storefront pages (separate phase)
 
 ---
@@ -156,3 +171,5 @@ Verify at minimum:
 * Raw stock never appears in any response payload.
 * `available` correctly reflects `stock > 0` per variant.
 * Product with zero variants does not crash listing or detail.
+* Product `images` are mapped `{ url, alt }` in sortOrder order and collection
+  detail carries `banner`; no storage keys or configuration leak.

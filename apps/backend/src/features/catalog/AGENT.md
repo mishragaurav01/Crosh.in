@@ -327,13 +327,14 @@ List categories (paginated).
 
 List products (paginated). Optional `category=<categorySlug>` filter.
 Items expose computed `priceMin`/`priceMax` (null when the product has no
-variants) and a reserved `images` slot (always empty until the images phase).
+variants) and their gallery as `images`: `{ url, alt }[]` ordered by
+`sortOrder` then creation time.
 
 `GET /api/products/:slug`
 
 Retrieve a product by slug with its variants ordered by creation time
-ascending. Variants expose `available` (`stock > 0`) and never raw stock
-counts.
+ascending, plus the same `images` gallery as the list shape. Variants expose
+`available` (`stock > 0`) and never raw stock counts.
 
 `GET /api/collections`
 
@@ -343,6 +344,11 @@ List collections (paginated).
 
 Retrieve a collection by slug with member variants ordered by membership
 creation time ascending; each member carries `productId`/`productName`.
+Collection detail exposes its banner as `banner: { url, alt } | null`
+(null when no banner image is attached).
+
+Category public payloads reserve a `banner: { url, alt } | null` slot
+(always null until category banners are surfaced publicly).
 
 Rules holding for every public response:
 
@@ -350,6 +356,8 @@ Rules holding for every public response:
 * Raw `stock` never appears anywhere; availability is exposed only as
   the `available` boolean.
 * Prices leave exactly as stored (integer minor units).
+* Image URLs are derived from stored object keys at DTO-mapping time;
+  object keys and any storage configuration never appear in a response.
 * Unknown slugs return 404 with the entity's `*_NOT_FOUND` code.
 * These endpoints must not gain write methods or identity requirements
   without an explicit new decision.

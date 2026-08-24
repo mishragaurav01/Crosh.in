@@ -1,5 +1,6 @@
 import type { PrismaClient } from "db/client";
 import { CatalogError } from "../types/catalog-errors.js";
+import { deleteImagesForOwner } from "./image.service.js";
 import { requireVariantsExist } from "./membership.service.js";
 
 export type CollectionWithVariants = {
@@ -135,6 +136,8 @@ export async function deleteCollection(params: {
   const { id, prisma } = params;
 
   await getCollection({ id, prisma });
+
+  await deleteImagesForOwner({ ownerType: "collection", ownerId: id, prisma });
 
   await prisma.$transaction(async (tx) => {
     await tx.variantCollection.deleteMany({ where: { collectionId: id } });

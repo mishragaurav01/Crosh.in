@@ -12,6 +12,7 @@ import Dialog from "@/components/ui/Dialog";
 import { PageLoading } from "@/components/ui/Loading";
 import CategoryForm from "./CategoryForm";
 import CatalogError from "./CatalogError";
+import BannerSlot from "./BannerSlot";
 import type { Category, CategoryCreateInput, CategoryUpdateInput, ApiError } from "../types";
 import {
   listCategories,
@@ -35,6 +36,7 @@ export default function CategoryManager() {
   const [formError, setFormError] = useState<ApiError | string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bannerFor, setBannerFor] = useState<Category | null>(null);
   const mounted = useRef(true);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT));
@@ -205,6 +207,9 @@ export default function CategoryManager() {
                 header: "",
                 render: (c) => (
                   <div className="flex justify-end gap-xs">
+                    <Button size="sm" variant="ghost" onClick={() => setBannerFor(c)}>
+                      Banner
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => openEdit(c)}>
                       Edit
                     </Button>
@@ -244,6 +249,17 @@ export default function CategoryManager() {
             onCancel={() => setFormOpen(false)}
           />
         </div>
+      </Dialog>
+
+      <Dialog
+        open={!!bannerFor}
+        onClose={() => setBannerFor(null)}
+        title={bannerFor ? `Banner — ${bannerFor.name}` : "Banner"}
+        maxWidth="md"
+      >
+        {bannerFor && (
+          <BannerSlot ownerType="category" ownerId={bannerFor.id} />
+        )}
       </Dialog>
 
       <ConfirmDialog

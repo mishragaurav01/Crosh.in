@@ -72,6 +72,10 @@ function createBasePrisma() {
       findMany: mock(() => Promise.resolve([])),
       count: mock(() => Promise.resolve(0)),
     },
+    image: {
+      findMany: mock(() => Promise.resolve([])),
+      deleteMany: mock(() => Promise.resolve({ count: 0 })),
+    },
   };
 
   prisma.$transaction = mock((fn: (tx: unknown) => unknown) => Promise.resolve(fn(prisma)));

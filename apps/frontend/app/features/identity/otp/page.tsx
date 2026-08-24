@@ -9,7 +9,7 @@ export const metadata = {
 export default function OtpPage({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string; next?: string }>;
 }) {
   return (
     <AuthLayout captionText="Security is the foundation of trust.">
@@ -21,10 +21,11 @@ export default function OtpPage({
 async function OtpPageInner({
   searchParams,
 }: {
-  searchParams: Promise<{ email?: string }>;
+  searchParams: Promise<{ email?: string; next?: string }>;
 }) {
   const params = await searchParams;
   const email = params.email ?? "";
+  const next = params.next;
 
   if (!email) {
     return (
@@ -42,5 +43,5 @@ async function OtpPageInner({
     );
   }
 
-  return <OtpForm email={email} />;
+  return <OtpForm email={email} next={next} />;
 }

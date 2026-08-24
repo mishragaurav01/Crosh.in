@@ -1,4 +1,21 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+const LOGIN_PATH = "/features/identity/login";
+
+let sessionExpiredHandled = false;
+
+function handleSessionExpiry(): void {
+  if (typeof window === "undefined") return;
+  if (sessionExpiredHandled) return;
+  sessionExpiredHandled = true;
+  const next = encodeURIComponent(
+    window.location.pathname + window.location.search,
+  );
+  // Deliberate full-page reload: discards all stale React state from the
+  // expired session. This module sits outside React, so useRouter/redirect()
+  // aren't available — see constitution/decisions.md "Session expiry UX".
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  window.location.assign(`${LOGIN_PATH}?next=${next}&reason=expired`);
+}
 
 export interface ApiError {
   code: string;
@@ -67,10 +84,24 @@ class ApiClient {
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
-    const json: ApiResponse<T> = await response.json();
+    let json: ApiResponse<T>;
+    try {
+      json = await response.json();
+    } catch {
+      // Non-JSON body (e.g. proxy/Express HTML error page) — surface a
+      // readable error instead of leaking JSON.parse SyntaxError text.
+      throw {
+        code: "BAD_RESPONSE",
+        message: `Server returned an unexpected response (HTTP ${response.status}).`,
+      };
+    }
 
     if (!json.success || json.error) {
-      throw json.error || { code: "UNKNOWN_ERROR", message: "An unexpected error occurred" };
+      const error = json.error || { code: "UNKNOWN_ERROR", message: "An unexpected error occurred" };
+      if (response.status === 401 || error.code === "UNAUTHENTICATED") {
+        handleSessionExpiry();
+      }
+      throw error;
     }
 
     return json.data;

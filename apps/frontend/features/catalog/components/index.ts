@@ -9,4 +9,8 @@ export { default as ProductDetail } from "./ProductDetail";
 export { default as VariantForm } from "./VariantForm";
 export { default as VariantManager } from "./VariantManager";
 export { default as CollectionMembership } from "./CollectionMembership";
+export { default as ImageUploader } from "./ImageUploader";
+export { default as MediaGallery } from "./MediaGallery";
+export { default as ImageManager } from "./ImageManager";
+export { default as BannerSlot } from "./BannerSlot";
 export { default as CatalogError } from "./CatalogError";
