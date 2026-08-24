@@ -9,9 +9,20 @@ import { useAuth } from "@/lib/auth-context";
 
 interface OtpFormProps {
   email: string;
+  next?: string;
 }
 
-export default function OtpForm({ email }: OtpFormProps) {
+function safeRelativePath(value: string | undefined): string | null {
+  if (!value) return null;
+  // Relative paths only — blocks open redirects (absolute URLs, protocol-
+  // relative "//host", backslash tricks).
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return null;
+  }
+  return value;
+}
+
+export default function OtpForm({ email, next }: OtpFormProps) {
   const router = useRouter();
   const { setAuth } = useAuth();
   const [digits, setDigits] = useState<string[]>(Array(6).fill(""));
@@ -47,7 +58,8 @@ export default function OtpForm({ email }: OtpFormProps) {
       try {
         const result = await verifyOtp(email, otpValue);
         setAuth(result.user, result.csrfToken);
-        router.push(result.user.isAdmin ? "/catalog/categories" : "/");
+        const destination = safeRelativePath(next) ?? (result.user.isAdmin ? "/catalog/categories" : "/");
+        router.push(destination);
       } catch (err) {
         if (err instanceof AuthApiError) {
           switch (err.code) {
@@ -79,7 +91,7 @@ export default function OtpForm({ email }: OtpFormProps) {
         setIsSubmitting(false);
       }
     },
-    [email, otpValue, setAuth, router],
+    [email, otpValue, next, setAuth, router],
   );
 
   return (

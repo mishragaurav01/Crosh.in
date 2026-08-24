@@ -124,3 +124,23 @@ backend infrastructure so future administrative features can use the same
 mechanism.
 
 **Status:** active
+
+## Session expiry UX pattern — 2026-08-23
+
+**Decision:** On any admin API response with HTTP 401 or error code
+`UNAUTHENTICATED` (excluding auth endpoints themselves), the shared frontend
+ApiClient performs a single hard redirect to
+`/features/identity/login?next=<current-path>&reason=expired`. The login flow
+shows a session-expired notice and preserves `next`; after OTP verify, the user
+returns to the original path (validated relative-path only, to prevent open
+redirect). A client-side guard on the `(admin)` layout additionally covers
+direct logged-out visits with a sign-in prompt.
+**Context:** Previously a mid-use expiry left the admin staring at "session
+expired" alert text with no way back to login; sidebar hid the user section
+entirely; no route guard existed.
+**Reasoning:** Centralized interception means no feature code handles expiry
+individually; hard redirect (`window.location.assign`) discards stale React
+state cleanly; identity endpoints use a separate fetch wrapper so auth calls
+can never trigger the redirect loop. UI-only by design — the backend remains
+the security boundary.
+**Status:** active

@@ -86,6 +86,7 @@ export default function AdminSidebar() {
 
 function AdminUserSection() {
   const { user, loading, logout } = useAuth();
+  const pathname = usePathname();
 
   if (loading) {
     return (
@@ -95,7 +96,19 @@ function AdminUserSection() {
     );
   }
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <div className="px-lg py-md border-t border-outline-variant/30">
+        <Link
+          href={`/features/identity/login?next=${encodeURIComponent(pathname)}`}
+          className="flex items-center gap-sm w-full px-md py-sm rounded-lg text-label-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface transition-colors"
+        >
+          <span className="material-symbols-outlined text-[20px]">login</span>
+          Sign In
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="px-lg py-md border-t border-outline-variant/30">
