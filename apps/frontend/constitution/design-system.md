@@ -24,6 +24,7 @@ tokens here first, then to `tailwind.config`, never the reverse.
 | Token | Value | Usage |
 |---|---|---|
 | `mauve-brown` | `#705959` | Primary brand color — logo, headings, primary buttons, active states |
+| `primary-fixed-dim` | `#ddc0c0` | Testimonial quote icon (tabulated 2026-08-24; was CSS-only) |
 | `blush` | `#fadbdb` | Accent — hero CTA button background |
 | `sage` | `#d7e2db` | Secondary accent — newsletter section background |
 | `sage-dark` | `#56615b` | Darker sage — outline buttons, borders on sage-adjacent sections |
@@ -37,6 +38,8 @@ tokens here first, then to `tailwind.config`, never the reverse.
 | `cream-alt` | `#f9f2f1` | Secondary card/section background (brand story teaser, footer) |
 | `border-soft` | `#ede7e6` | Border on circular collection thumbnails |
 | `dot-inactive` | `#e8e1e0` | Inactive carousel indicator dots |
+| `surface-container` | `#f3ecec` | Inactive filter chip background (tabulated 2026-08-24; was CSS-only) |
+| `outline-variant` | `#d2c3c3` | Inactive filter chip border (tabulated 2026-08-24; was CSS-only) |
 | `white` | `#ffffff` | Testimonial card background, text on filled brand buttons |
 
 ### Text
@@ -79,7 +82,10 @@ accumulate small drift — this file is what stays canonical.
 | Logo / wordmark | Playfair Display | Regular | 32px | 38.4px |
 | Section heading (H3-equivalent) | Playfair Display | Medium | 24px | 31.2px |
 | Card/subsection heading (H4) | Playfair Display | Regular | 16px | 24px |
+| Grid product title (T1, approved 2026-08-24) | Playfair Display | Regular | 18px | 22px |
 | Body text | Inter | Regular | 16px | 24px |
+| Relaxed body (T3, approved 2026-08-24) — descriptions, footer links, related prices | Inter | Regular | 16px | 26px |
+| Eyebrow/label (T2, approved 2026-08-24) — price labels, accordion headers, review authors, related card titles; uppercase variant for SELECT COLOR-style labels | Inter | Medium | 14px | 20px (tracking 0.7px) |
 | Body text, italic (testimonial) | Inter | Italic | 16px | 24px |
 | Nav label | Inter | Semibold | 12px | 16.8px |
 
@@ -105,7 +111,15 @@ are brand-level decisions.
 |---|---|
 | Card elevation | `0px 10px 30px -5px rgba(112,89,89,0.08)` (uses brand mauve-brown as shadow tint, not neutral black) |
 | Button drop shadow | `0px 1px 1px rgba(0,0,0,0.05)` |
-| Bottom nav bar | `0px -4px 10px rgba(0,0,0,0.04)` |
+| Bottom nav bar | `0px -4px 20px rgba(0,0,0,0.04)` (blur corrected 10px → 20px per newer Figma frames, approved 2026-08-24) |
+| Review card (approved 2026-08-24) | `0px 20px 40px rgba(112,89,89,0.04)` |
+| Primary CTA (approved 2026-08-24) | `0px 10px 15px -3px rgba(112,89,89,0.1), 0px 4px 6px -4px rgba(112,89,89,0.1)` |
+
+These shadows are exposed as Tailwind utilities via `@theme` tokens in
+`globals.css`: `--shadow-card` (`shadow-card`), `--shadow-button`
+(`shadow-button`), `--shadow-bottom-nav` (`shadow-bottom-nav`),
+`--shadow-review-card` (`shadow-review-card`), `--shadow-cta`
+(`shadow-cta`).
 
 Note the card shadow tints toward the brand color rather than pure black — carry
 this through consistently rather than defaulting to a generic gray shadow.
@@ -134,6 +148,7 @@ one-off values.
 - **OTP digit input:** 48x48px, `8px` radius, white/cream background, `#e8e1e0` border default, `focus-ring` (mauve-brown) on active — one box per digit, 6 total.
 - **Split auth layout (desktop only):** two-pane, left panel is a full-height rounded-24px lifestyle image with dark gradient overlay and white text caption; right panel is the form, max-width 400px, vertically centered. Mobile uses a single-column stacked layout instead — no split pane below desktop breakpoint.
 - **Transactional header (auth screens):** simplified top bar — logo centered, back/close button left, no primary nav links, no bottom nav bar. Distinct from the storefront header/footer used elsewhere.
+- **Storefront footer variants (R1, approved 2026-08-24):** Home footer has a flat top; catalog-page footer variant uses a 32px top-corner radius (`rounded-t-4xl`) with increased top padding.
 
 As more screens are pulled, add new component patterns here rather than letting
 each feature reinvent card/button treatment independently.

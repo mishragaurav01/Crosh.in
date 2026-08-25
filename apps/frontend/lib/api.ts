@@ -30,11 +30,10 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedData<T> {
-  items: T[];
+  data: T[];
   total: number;
   page: number;
-  pageSize: number;
-  totalPages: number;
+  limit: number;
 }
 
 class ApiClient {
@@ -46,7 +45,12 @@ class ApiClient {
 
   private getCsrfToken(): string | null {
     if (typeof document === "undefined") return null;
-    const match = document.cookie.match(/csrf_token=([^;]+)/);
+    // Identity sessions use csrf_token; guest carts use the JS-readable
+    // cart_csrf cookie issued alongside the httpOnly guest_token. Either
+    // satisfies the double-submit check for its own surface.
+    const match =
+      document.cookie.match(/csrf_token=([^;]+)/) ??
+      document.cookie.match(/cart_csrf=([^;]+)/);
     return match ? match[1] : null;
   }
 

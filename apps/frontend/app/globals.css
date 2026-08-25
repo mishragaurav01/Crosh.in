@@ -58,6 +58,7 @@
 
 
   /* --- Spacing --- */
+  --spacing: 0.25rem;
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-base: 8px;
@@ -71,6 +72,14 @@
   /* --- Fonts mapped from layout.tsx --- */
   --font-playfair: var(--font-playfair);
   --font-inter: var(--font-inter);
+
+  /* --- Shadows (values from constitution/design-system.md) --- */
+  --shadow-card: 0px 10px 30px -5px rgba(112, 89, 89, 0.08);
+  --shadow-button: 0px 1px 1px rgba(0, 0, 0, 0.05);
+  --shadow-bottom-nav: 0px -4px 20px rgba(0, 0, 0, 0.04);
+  --shadow-review-card: 0px 20px 40px rgba(112, 89, 89, 0.04);
+  --shadow-cta: 0px 10px 15px -3px rgba(112, 89, 89, 0.1),
+    0px 4px 6px -4px rgba(112, 89, 89, 0.1);
 }
 
 /* Custom Text Size Utilities */
@@ -194,5 +203,66 @@ body {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* --- Storefront Design Utilities --- */
+
+/* Editorial divider line */
+.editorial-line {
+  height: 1px;
+  background: linear-gradient(to right, transparent, var(--color-outline-variant), transparent);
+}
+
+/* Glass-morphism card */
+.glass-card {
+  background: rgba(255, 248, 247, 0.7);
+  backdrop-filter: blur(12px);
+}
+
+/* Soft elevated shadow */
+.soft-shadow {
+  box-shadow: 0 10px 30px -5px rgba(112, 89, 89, 0.08);
+}
+
+/* Product card hover zoom */
+.hover-zoom:hover img {
+  transform: scale(1.05);
+}
+
+/* Hide scrollbar for horizontal rails */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Subtle zoom animation */
+@keyframes subtle-zoom {
+  0% {
+    transform: scale(1);
+  }
+
+  100% {
+    transform: scale(1.05);
+  }
+}
+
+/* Custom scrollbar styling for desktop */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-background);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-primary-fixed-dim);
+    border-radius: 10px;
   }
 }

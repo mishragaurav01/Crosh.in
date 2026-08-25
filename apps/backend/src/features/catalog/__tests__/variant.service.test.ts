@@ -12,12 +12,15 @@ const mockVariant = {
   sku: "TEE-S-BLK",
   size: "S",
   color: "Black",
+  colorId: null,
   price: 2999,
   stock: 50,
   productId: "prod-1",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
+
+const mockColorOption = { id: "col-1", name: "black", hex: "#1d1b1b", createdAt: new Date(), updatedAt: new Date() };
 
 function createMockPrisma(overrides: Record<string, unknown> = {}) {
   return {
@@ -26,6 +29,10 @@ function createMockPrisma(overrides: Record<string, unknown> = {}) {
         Promise.resolve({ id: "prod-1", name: "Tee", slug: "tee", categoryId: "cat-1", description: null, createdAt: new Date(), updatedAt: new Date() }),
       ),
       ...((overrides.product as object) ?? {}),
+    },
+    colorOption: {
+      findUnique: mock(() => Promise.resolve(mockColorOption)),
+      ...((overrides.colorOption as object) ?? {}),
     },
     variant: {
       create: mock(() => Promise.resolve(mockVariant)),
@@ -95,6 +102,38 @@ describe("createVariant", () => {
     ).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_SKU", statusCode: 409 }),
     );
+  });
+
+  it("passes a validated colorId through on create", async () => {
+    const prisma = createMockPrisma();
+    await createVariant({
+      productId: "prod-1",
+      sku: "TEE-S-BLK",
+      size: "S",
+      color: "Black",
+      price: 2999,
+      stock: 0,
+      colorId: "col-1",
+      prisma,
+    });
+
+    expect(prisma.colorOption.findUnique).toHaveBeenCalledWith({ where: { id: "col-1" } });
+    expect(prisma.variant.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ colorId: "col-1" }),
+    });
+  });
+
+  it("throws INVALID_COLOR_OPTION when the referenced option does not exist on create", async () => {
+    const prisma = createMockPrisma({
+      colorOption: { findUnique: mock(() => Promise.resolve(null)) },
+    });
+
+    await expect(
+      createVariant({ productId: "prod-1", sku: "X", size: "S", color: "Black", price: 100, stock: 0, colorId: "missing", prisma }),
+    ).rejects.toThrow(
+      expect.objectContaining({ code: "INVALID_COLOR_OPTION", statusCode: 400 }),
+    );
+    expect(prisma.variant.create).not.toHaveBeenCalled();
   });
 });
 
@@ -178,6 +217,41 @@ describe("updateVariant", () => {
     ).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_SKU", statusCode: 409 }),
     );
+  });
+
+  it("accepts a validated colorId on update", async () => {
+    const prisma = createMockPrisma();
+    await updateVariant({ productId: "prod-1", variantId: "var-1", colorId: "col-1", prisma });
+
+    expect(prisma.colorOption.findUnique).toHaveBeenCalledWith({ where: { id: "col-1" } });
+    expect(prisma.variant.update).toHaveBeenCalledWith({
+      where: { id: "var-1" },
+      data: expect.objectContaining({ colorId: "col-1" }),
+    });
+  });
+
+  it("throws INVALID_COLOR_OPTION when the referenced option does not exist on update", async () => {
+    const prisma = createMockPrisma({
+      colorOption: { findUnique: mock(() => Promise.resolve(null)) },
+    });
+
+    await expect(
+      updateVariant({ productId: "prod-1", variantId: "var-1", colorId: "missing", prisma }),
+    ).rejects.toThrow(
+      expect.objectContaining({ code: "INVALID_COLOR_OPTION", statusCode: 400 }),
+    );
+    expect(prisma.variant.update).not.toHaveBeenCalled();
+  });
+
+  it("clears the color link with an explicit null colorId", async () => {
+    const prisma = createMockPrisma();
+    await updateVariant({ productId: "prod-1", variantId: "var-1", colorId: null, prisma });
+
+    expect(prisma.colorOption.findUnique).not.toHaveBeenCalled();
+    expect(prisma.variant.update).toHaveBeenCalledWith({
+      where: { id: "var-1" },
+      data: expect.objectContaining({ colorId: null }),
+    });
   });
 });
 
