@@ -15,6 +15,7 @@ const mockProduct = {
   description: null,
   slug: "basic-tee",
   categoryId: "cat-1",
+  status: "PUBLISHED",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -91,6 +92,24 @@ describe("createProduct", () => {
       expect.objectContaining({ code: "DUPLICATE_SLUG", statusCode: 409 }),
     );
   });
+
+  it("defaults status to DRAFT when status is omitted", async () => {
+    const prisma = createMockPrisma();
+    await createProduct({ name: "Basic Tee", slug: "basic-tee", categoryId: "cat-1", prisma });
+
+    expect(prisma.product.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ slug: "basic-tee", status: "DRAFT" }),
+    });
+  });
+
+  it("passes an explicit status through on create", async () => {
+    const prisma = createMockPrisma();
+    await createProduct({ name: "Basic Tee", slug: "basic-tee", categoryId: "cat-1", status: "PUBLISHED", prisma });
+
+    expect(prisma.product.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: "PUBLISHED" }),
+    });
+  });
 });
 
 describe("listProducts", () => {
@@ -108,6 +127,25 @@ describe("listProducts", () => {
 
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { categoryId: "cat-1" } }),
+    );
+  });
+
+  it("filters by status when provided", async () => {
+    const prisma = createMockPrisma();
+    await listProducts({ page: 1, limit: 20, status: "DRAFT", prisma });
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: "DRAFT" } }),
+    );
+    expect(prisma.product.count).toHaveBeenCalledWith({ where: { status: "DRAFT" } });
+  });
+
+  it("combines categoryId and status filters", async () => {
+    const prisma = createMockPrisma();
+    await listProducts({ page: 1, limit: 20, categoryId: "cat-1", status: "PUBLISHED", prisma });
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { categoryId: "cat-1", status: "PUBLISHED" } }),
     );
   });
 });
@@ -180,6 +218,16 @@ describe("updateProduct", () => {
     ).rejects.toThrow(
       expect.objectContaining({ code: "DUPLICATE_SLUG", statusCode: 409 }),
     );
+  });
+
+  it("accepts a status transition and passes it through", async () => {
+    const prisma = createMockPrisma();
+    await updateProduct({ id: "prod-1", status: "PUBLISHED", prisma });
+
+    expect(prisma.product.update).toHaveBeenCalledWith({
+      where: { id: "prod-1" },
+      data: expect.objectContaining({ status: "PUBLISHED" }),
+    });
   });
 });
 

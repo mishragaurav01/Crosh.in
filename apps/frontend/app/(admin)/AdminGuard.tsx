@@ -22,7 +22,7 @@ export default function AdminGuard({ children }: { children: ReactNode }) {
     const next = encodeURIComponent(pathname);
     return (
       <div className="flex-1 flex items-center justify-center min-h-screen p-lg">
-        <div className="max-w-md w-full text-center bg-surface-container-lowest rounded-xl border border-outline-variant/30 p-xl">
+        <div className="max-w-[28rem] w-full text-center bg-surface-container-lowest rounded-xl border border-outline-variant/30 p-xl">
           <div className="w-12 h-12 rounded-full bg-error-container mx-auto mb-md flex items-center justify-center">
             <span className="material-symbols-outlined text-on-error-container text-[24px]">
               lock_clock

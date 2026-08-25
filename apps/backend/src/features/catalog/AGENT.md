@@ -251,11 +251,14 @@ Delete a collection.
 
 `POST /api/admin/products`
 
-Create a product.
+Create a product. Bodies may carry `status`
+(`DRAFT | PUBLISHED | ARCHIVED`); new products default to `DRAFT` when
+omitted.
 
 `GET /api/admin/products`
 
-List products.
+List products. All statuses are returned by default; an optional
+`?status=DRAFT|PUBLISHED|ARCHIVED` query filters to one status.
 
 `GET /api/admin/products/:id`
 
@@ -263,7 +266,8 @@ Retrieve a product.
 
 `PATCH /api/admin/products/:id`
 
-Update a product.
+Update a product. Accepts an optional `status` transition
+(`DRAFT | PUBLISHED | ARCHIVED`).
 
 `DELETE /api/admin/products/:id`
 
@@ -332,9 +336,11 @@ variants) and their gallery as `images`: `{ url, alt }[]` ordered by
 
 `GET /api/products/:slug`
 
-Retrieve a product by slug with its variants ordered by creation time
-ascending, plus the same `images` gallery as the list shape. Variants expose
-`available` (`stock > 0`) and never raw stock counts.
+Retrieve a product by slug with its variants ordered by `sortOrder`
+ascending, then creation time ascending, plus the same `images` gallery as
+the list shape. Variants expose `available` (`stock > 0`) and never raw
+stock counts; each also carries `colorHex: string | null` (hex from its
+grounded ColorOption lookup; null while no option is linked).
 
 `GET /api/collections`
 
@@ -343,9 +349,15 @@ List collections (paginated).
 `GET /api/collections/:slug`
 
 Retrieve a collection by slug with member variants ordered by membership
-creation time ascending; each member carries `productId`/`productName`.
-Collection detail exposes its banner as `banner: { url, alt } | null`
-(null when no banner image is attached).
+creation time ascending; each member carries
+`productId`/`productName`/`productSlug`. Collection detail exposes its banner
+as `banner: { url, alt } | null` (null when no banner image is attached).
+
+Collection detail also carries `products[]`: one card summary per distinct
+published member product, in membership first-seen order, shaped identically
+to `/api/products` list items — `priceMin`/`priceMax` span the product's full
+variant set, so cards match the products list exactly. Draft/archived member
+products never produce cards. The raw member `variants[]` array is retained.
 
 Category public payloads reserve a `banner: { url, alt } | null` slot
 (always null until category banners are surfaced publicly).
@@ -353,6 +365,9 @@ Category public payloads reserve a `banner: { url, alt } | null` slot
 Rules holding for every public response:
 
 * Payloads are explicitly DTO-mapped — no raw Prisma model passthrough.
+* Only `PUBLISHED` products surface publicly: draft/archived detail returns
+  404 indistinguishable from absence, and they never appear in product lists
+  or collection `products[]` summaries.
 * Raw `stock` never appears anywhere; availability is exposed only as
   the `available` boolean.
 * Prices leave exactly as stored (integer minor units).

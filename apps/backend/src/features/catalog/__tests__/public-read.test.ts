@@ -12,6 +12,10 @@ import {
 } from "../routes/public.routes.js";
 import { requireSession } from "../../identity/middleware/session.middleware.js";
 import { requireAdmin } from "../../identity/middleware/admin.middleware.js";
+import {
+  getPublicCollection,
+  listPublicProducts,
+} from "../services/public-catalog.service.js";
 
 process.env.S3_ENDPOINT = "https://test-ref.supabase.co/storage/v1/s3";
 process.env.S3_REGION = "us-east-1";
@@ -62,11 +66,15 @@ function project(row: Row, select?: Row): Row {
   if (!select) {
     return { ...row };
   }
-  return Object.fromEntries(
-    Object.entries(select)
-      .filter(([, value]) => value === true)
-      .map(([key]) => [key, row[key]]),
-  );
+  const out: Row = {};
+  for (const [key, value] of Object.entries(select)) {
+    if (value === true) {
+      out[key] = row[key];
+    } else if (value && typeof value === "object") {
+      out[key] = row[key] == null ? null : project(row[key] as Row, (value as Row).select);
+    }
+  }
+  return out;
 }
 
 function createPublicPrisma() {
@@ -81,6 +89,29 @@ function createPublicPrisma() {
   const byCreatedDesc = (a: Row, b: Row) => b.createdAt.getTime() - a.createdAt.getTime();
   const byImageOrder = (a: Row, b: Row) =>
     a.sortOrder - b.sortOrder || a.createdAt.getTime() - b.createdAt.getTime();
+
+  // Honors prisma-style orderBy specs: single object or ordered array of
+  // { field: "asc" | "desc" } entries, later entries acting as tiebreakers.
+  function compareBy(orderBy: any): (a: Row, b: Row) => number {
+    const specs = Array.isArray(orderBy) ? orderBy : [orderBy ?? {}];
+    return (a: Row, b: Row) => {
+      for (const spec of specs) {
+        for (const [field, dir] of Object.entries(spec)) {
+          const av = a[field];
+          const bv = b[field];
+          if (av === bv) {
+            continue;
+          }
+          const diff =
+            av instanceof Date && bv instanceof Date
+              ? av.getTime() - bv.getTime()
+              : (av as number) - (bv as number);
+          return dir === "desc" ? -diff : diff;
+        }
+      }
+      return 0;
+    };
+  }
 
   function paginated(rows: Row[], skip?: number, take?: number): Row[] {
     return rows.slice(skip ?? 0, take !== undefined ? (skip ?? 0) + take : undefined);
@@ -136,28 +167,41 @@ function createPublicPrisma() {
           if (where?.categoryId !== undefined) {
             rows = rows.filter((p) => p.categoryId === where.categoryId);
           }
+          if (where?.status !== undefined) {
+            rows = rows.filter((p) => p.status === where.status);
+          }
           rows.sort(orderBy?.createdAt === "asc" ? byCreatedAsc : byCreatedDesc);
           return paginated(rows, skip, take).map((p) => ({
             ...project(p, select),
             variants: [...variants]
               .filter((v) => v.productId === p.id)
-              .sort(byCreatedAsc)
+              .sort(compareBy(select.variants.orderBy))
               .map((v) => project(v, select.variants.select)),
             ...(select.images
               ? { images: imagesFor("productId", p.id, select.images) }
               : {}),
           }));
         },
-        findUnique: async ({ where, select }: any) => {
-          const p = products.find((x) => x.slug === where.slug);
+        findFirst: async ({ where, select }: any) => {
+          const p = products.find(
+            (x) => x.slug === where.slug && x.status === where.status,
+          );
           if (!p) {
             return null;
           }
           return {
             ...project(p, select),
+            ...(select.category
+              ? {
+                  category: project(
+                    categories.find((c) => c.id === p.categoryId)!,
+                    select.category.select,
+                  ),
+                }
+              : {}),
             variants: [...variants]
               .filter((v) => v.productId === p.id)
-              .sort(byCreatedAsc)
+              .sort(compareBy(select.variants.orderBy))
               .map((v) => project(v, select.variants.select)),
             ...(select.images
               ? { images: imagesFor("productId", p.id, select.images) }
@@ -165,9 +209,11 @@ function createPublicPrisma() {
           };
         },
         count: async ({ where }: any = {}) =>
-          where?.categoryId !== undefined
-            ? products.filter((p) => p.categoryId === where.categoryId).length
-            : products.length,
+          products.filter(
+            (p) =>
+              (where?.categoryId === undefined || p.categoryId === where.categoryId) &&
+              (where?.status === undefined || p.status === where.status),
+          ).length,
       },
       collection: {
         findUnique: async ({ where, select }: any) => {
@@ -186,13 +232,25 @@ function createPublicPrisma() {
               .sort(byCreatedAsc)
               .map((m) => {
                 const v = variants.find((x) => x.id === m.variantId)!;
+                const productSelect = variantSelect.product.select;
+                const product = products.find((p) => p.id === v.productId)!;
                 return {
                   variant: {
                     ...project(v, variantSelect),
-                    product: project(
-                      products.find((p) => p.id === v.productId)!,
-                      variantSelect.product.select,
-                    ),
+                    product: {
+                      ...project(product, productSelect),
+                      ...(productSelect.images
+                        ? { images: imagesFor("productId", product.id, productSelect.images) }
+                        : {}),
+                      ...(productSelect.variants
+                        ? {
+                            variants: [...variants]
+                              .filter((x) => x.productId === product.id)
+                              .sort(compareBy(productSelect.variants.orderBy))
+                              .map((x) => project(x, productSelect.variants.select)),
+                          }
+                        : {}),
+                    },
                   },
                 };
               }),
@@ -211,10 +269,10 @@ function createPublicPrisma() {
 function seedFixture() {
   const db = createPublicPrisma();
   db.seedCategory({ id: "cat-1", name: "Tees", description: null, slug: "tees", createdAt: T0, updatedAt: T0 });
-  db.seedProduct({ id: "prod-1", name: "Tee", description: "A tee", slug: "tee", categoryId: "cat-1", createdAt: T0, updatedAt: T0 });
-  db.seedProduct({ id: "prod-2", name: "Empty", description: null, slug: "empty", categoryId: "cat-1", createdAt: T1, updatedAt: T1 });
-  db.seedVariant({ id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", price: 2999, stock: 0, productId: "prod-1", createdAt: T0, updatedAt: T0 });
-  db.seedVariant({ id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", price: 4999, stock: 5, productId: "prod-1", createdAt: T1, updatedAt: T1 });
+  db.seedProduct({ id: "prod-1", name: "Tee", description: "A tee", slug: "tee", categoryId: "cat-1", status: "PUBLISHED", createdAt: T0, updatedAt: T0 });
+  db.seedProduct({ id: "prod-2", name: "Empty", description: null, slug: "empty", categoryId: "cat-1", status: "PUBLISHED", createdAt: T1, updatedAt: T1 });
+  db.seedVariant({ id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", colorOption: { hex: "#1d1b1b" }, price: 2999, stock: 0, productId: "prod-1", sortOrder: 0, createdAt: T0, updatedAt: T0 });
+  db.seedVariant({ id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", colorOption: { hex: "#1d1b1b" }, price: 4999, stock: 5, productId: "prod-1", sortOrder: 1, createdAt: T1, updatedAt: T1 });
   db.seedCollection({ id: "col-1", name: "Summer", description: null, slug: "summer", createdAt: T0, updatedAt: T0 });
   db.seedMembership({ id: "vc-1", variantId: "var-2", collectionId: "col-1", createdAt: T2 });
   return db;
@@ -363,7 +421,7 @@ describe("public products list", () => {
   it("filters by category slug", async () => {
     const db = seedFixture();
     db.seedCategory({ id: "cat-2", name: "Mugs", description: null, slug: "mugs", createdAt: T1, updatedAt: T1 });
-    db.seedProduct({ id: "prod-3", name: "Mug", description: null, slug: "mug", categoryId: "cat-2", createdAt: T2, updatedAt: T2 });
+    db.seedProduct({ id: "prod-3", name: "Mug", description: null, slug: "mug", categoryId: "cat-2", status: "PUBLISHED", createdAt: T2, updatedAt: T2 });
     const controller = createPublicProductController(db.prisma);
     const res = createMockRes();
 
@@ -404,6 +462,21 @@ describe("public products list", () => {
       }),
     );
   });
+
+  it("returns published products only, excluding drafts and archived", async () => {
+    const db = seedFixture();
+    db.seedProduct({ id: "prod-draft", name: "Draft Tee", description: null, slug: "draft-tee", categoryId: "cat-1", status: "DRAFT", createdAt: T2, updatedAt: T2 });
+    db.seedProduct({ id: "prod-archived", name: "Old Tee", description: null, slug: "old-tee", categoryId: "cat-1", status: "ARCHIVED", createdAt: T2, updatedAt: T2 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.listHandler(createMockReq(undefined, { page: "1", limit: "20" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.data.total).toBe(2);
+    expect(body.data.data.map((p: Row) => p.slug).sort()).toEqual(["empty", "tee"]);
+  });
 });
 
 describe("public product detail", () => {
@@ -417,12 +490,26 @@ describe("public product detail", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json.mock.calls[0][0];
     expect(body.success).toBe(true);
+    expect(body.data.categorySlug).toBe("tees");
     expect(body.data.variants).toEqual([
-      { id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", price: 2999, available: false },
-      { id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", price: 4999, available: true },
+      { id: "var-1", sku: "TEE-S-BLK", size: "S", color: "Black", colorHex: "#1d1b1b", price: 2999, available: false },
+      { id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", colorHex: "#1d1b1b", price: 4999, available: true },
     ]);
     expect(JSON.stringify(body)).not.toContain('"stock"');
     expect(JSON.stringify(body)).not.toContain("createdAt");
+  });
+
+  it("exposes null colorHex for variants without a linked color option", async () => {
+    const db = seedFixture();
+    db.seedVariant({ id: "var-nolink", sku: "TEE-XS-MAUVE", size: "XS", color: "Mauve", price: 2499, stock: 2, productId: "prod-1", sortOrder: 3, createdAt: T2, updatedAt: T2 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "tee" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const mauve = res.json.mock.calls[0][0].data.variants.find((v: Row) => v.id === "var-nolink");
+    expect(mauve.colorHex).toBeNull();
   });
 
   it("fills the product gallery with derived urls ordered by sortOrder", async () => {
@@ -469,6 +556,60 @@ describe("public product detail", () => {
     expect(data.priceMax).toBeNull();
     expect(data.variants).toEqual([]);
   });
+
+  it("orders variants by sortOrder asc when it differs from creation order, breaking ties by createdAt", async () => {
+    const db = seedFixture();
+    // Created before the fixtures but forced last via sortOrder.
+    db.seedVariant({ id: "var-a", sku: "TEE-XL-BLK", size: "XL", color: "Black", price: 5999, stock: 3, productId: "prod-1", sortOrder: 2, createdAt: T0, updatedAt: T0 });
+    // Created after every fixture but pulled to the front via sortOrder.
+    db.seedVariant({ id: "var-b", sku: "TEE-XXS-BLK", size: "XXS", color: "Black", price: 1999, stock: 4, productId: "prod-1", sortOrder: 0, createdAt: T2, updatedAt: T2 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "tee" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const skus = res.json.mock.calls[0][0].data.variants.map((v: Row) => v.sku);
+    // var-b ties with var-1 at sortOrder 0 and loses the tie (created later);
+    // var-a has the highest sortOrder despite being created first.
+    expect(skus).toEqual(["TEE-S-BLK", "TEE-XXS-BLK", "TEE-M-BLK", "TEE-XL-BLK"]);
+  });
+
+  it("returns a draft product the same 404 payload as an unknown slug", async () => {
+    const db = seedFixture();
+    db.seedProduct({ id: "prod-draft", name: "Draft Tee", description: null, slug: "draft-tee", categoryId: "cat-1", status: "DRAFT", createdAt: T2, updatedAt: T2 });
+    const controller = createPublicProductController(db.prisma);
+
+    const draftRes = createMockRes();
+    await controller.getHandler(createMockReq({ slug: "draft-tee" }), draftRes);
+
+    const missingRes = createMockRes();
+    await controller.getHandler(createMockReq({ slug: "never-existed" }), missingRes);
+
+    expect(draftRes.statusCode).toBe(404);
+    expect(missingRes.statusCode).toBe(404);
+    // Indistinguishable: identical envelope for "hidden" and "absent".
+    expect(draftRes.json.mock.calls[0][0]).toEqual({
+      success: false,
+      error: { code: "PRODUCT_NOT_FOUND", message: "Product not found" },
+    });
+    expect(draftRes.json.mock.calls[0][0]).toEqual(missingRes.json.mock.calls[0][0]);
+  });
+
+  it("hides archived products from public detail with the same 404", async () => {
+    const db = seedFixture();
+    db.seedProduct({ id: "prod-archived", name: "Old Tee", description: null, slug: "old-tee", categoryId: "cat-1", status: "ARCHIVED", createdAt: T2, updatedAt: T2 });
+    const controller = createPublicProductController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "old-tee" }), res);
+
+    expect(res.statusCode).toBe(404);
+    expect(res.json).toHaveBeenCalledWith({
+      success: false,
+      error: { code: "PRODUCT_NOT_FOUND", message: "Product not found" },
+    });
+  });
 });
 
 describe("public collections list", () => {
@@ -495,7 +636,7 @@ describe("public collections list", () => {
 describe("public collection detail", () => {
   it("lists member variants with product context in membership creation order and never exposes stock", async () => {
     const db = seedFixture();
-    db.seedVariant({ id: "var-3", sku: "TEE-L-BLK", size: "L", color: "White", price: 3500, stock: 0, productId: "prod-1", createdAt: T2, updatedAt: T2 });
+    db.seedVariant({ id: "var-3", sku: "TEE-L-BLK", size: "L", color: "White", colorOption: { hex: "#ffffff" }, price: 3500, stock: 0, productId: "prod-1", sortOrder: 2, createdAt: T2, updatedAt: T2 });
     db.seedMembership({ id: "vc-0", variantId: "var-3", collectionId: "col-1", createdAt: T1 });
 
     const controller = createPublicCollectionController(db.prisma);
@@ -507,10 +648,85 @@ describe("public collection detail", () => {
     const body = res.json.mock.calls[0][0];
     expect(body.success).toBe(true);
     expect(body.data.variants).toEqual([
-      { id: "var-3", sku: "TEE-L-BLK", size: "L", color: "White", price: 3500, available: false, productId: "prod-1", productName: "Tee" },
-      { id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", price: 4999, available: true, productId: "prod-1", productName: "Tee" },
+      { id: "var-3", sku: "TEE-L-BLK", size: "L", color: "White", colorHex: "#ffffff", price: 3500, available: false, productId: "prod-1", productName: "Tee", productSlug: "tee" },
+      { id: "var-2", sku: "TEE-M-BLK", size: "M", color: "Black", colorHex: "#1d1b1b", price: 4999, available: true, productId: "prod-1", productName: "Tee", productSlug: "tee" },
     ]);
     expect(JSON.stringify(body)).not.toContain('"stock"');
+  });
+
+  it("groups distinct published member products into card summaries in membership order, excluding drafts", async () => {
+    const db = seedFixture();
+    db.seedProduct({ id: "prod-3", name: "Scarf", description: "A scarf", slug: "scarf", categoryId: "cat-1", status: "PUBLISHED", createdAt: T1, updatedAt: T1 });
+    db.seedVariant({ id: "var-4", sku: "SCARF-RED", size: "One Size", color: "Red", colorOption: null, price: 1500, stock: 3, productId: "prod-3", sortOrder: 0, createdAt: T0, updatedAt: T0 });
+    db.seedVariant({ id: "var-5", sku: "SCARF-BLU", size: "One Size", color: "Blue", colorOption: null, price: 8900, stock: 0, productId: "prod-3", sortOrder: 1, createdAt: T0, updatedAt: T0 });
+    db.seedProduct({ id: "prod-4", name: "Draft Hat", description: null, slug: "draft-hat", categoryId: "cat-1", status: "DRAFT", createdAt: T2, updatedAt: T2 });
+    db.seedVariant({ id: "var-6", sku: "HAT-DRAFT", size: "One Size", color: "Black", colorOption: null, price: 500, stock: 1, productId: "prod-4", sortOrder: 0, createdAt: T2, updatedAt: T2 });
+    // Scarf's membership lands before Tee's (T2): cards follow membership
+    // first-seen order, not product creation order.
+    db.seedMembership({ id: "vc-scarf", variantId: "var-5", collectionId: "col-1", createdAt: T0 });
+    db.seedMembership({ id: "vc-draft", variantId: "var-6", collectionId: "col-1", createdAt: T1 });
+
+    const controller = createPublicCollectionController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "summer" }), res);
+
+    expect(res.statusCode).toBe(200);
+    const body = res.json.mock.calls[0][0];
+    expect(body.data.products).toEqual([
+      {
+        id: "prod-3",
+        name: "Scarf",
+        slug: "scarf",
+        description: "A scarf",
+        priceMin: 1500,
+        priceMax: 8900,
+        images: [],
+      },
+      {
+        id: "prod-1",
+        name: "Tee",
+        slug: "tee",
+        description: "A tee",
+        // var-1 (2999) is not in this collection; the card still spans the
+        // product's full variant set.
+        priceMin: 2999,
+        priceMax: 4999,
+        images: [],
+      },
+    ]);
+    // The draft member keeps its variant row but never becomes a card.
+    expect(body.data.variants.map((v: Row) => v.id)).toEqual(["var-5", "var-6", "var-2"]);
+  });
+
+  it("card summaries are identical to /api/products list items (priceMin parity)", async () => {
+    const db = seedFixture();
+    const detail = await getPublicCollection({ slug: "summer", prisma: db.prisma });
+    // prod-1's cheapest variant (2999) is not a collection member, so any
+    // member-only price computation would diverge from the products list here.
+    const listed = await listPublicProducts({ page: 1, limit: 10, prisma: db.prisma });
+
+    expect(detail.products.length).toBeGreaterThan(0);
+    for (const card of detail.products) {
+      // A missing list row must fail loudly, hence the assertion + toEqual.
+      const listItem = listed.data.find((p) => p.id === card.id);
+      if (!listItem) {
+        throw new Error(`card ${card.id} missing from /api/products output`);
+      }
+      expect(card).toEqual(listItem);
+    }
+  });
+
+  it("returns an empty products array for a zero-member collection", async () => {
+    const db = seedFixture();
+    db.seedCollection({ id: "col-empty", name: "Empty", description: null, slug: "empty-collection", createdAt: T1, updatedAt: T1 });
+    const controller = createPublicCollectionController(db.prisma);
+    const res = createMockRes();
+
+    await controller.getHandler(createMockReq({ slug: "empty-collection" }), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json.mock.calls[0][0].data.products).toEqual([]);
   });
 
   it("exposes the collection banner as a derived url when an image exists", async () => {

@@ -7,6 +7,7 @@ export const variantCreateBodySchema = z.object({
   color: z.string().min(1, "Color is required").max(50, "Color must be 50 characters or fewer"),
   price: priceSchema,
   stock: nonNegativeIntSchema.default(0),
+  colorId: z.string().min(1, "Color ID must be a non-empty string").nullable().optional(),
 });
 
 export const variantUpdateBodySchema = z.object({
@@ -15,6 +16,8 @@ export const variantUpdateBodySchema = z.object({
   color: z.string().min(1, "Color is required").max(50, "Color must be 50 characters or fewer").optional(),
   price: priceSchema.optional(),
   stock: nonNegativeIntSchema.optional(),
+  // Explicit null clears the link (transition period keeps free-text color authoritative).
+  colorId: z.string().min(1, "Color ID must be a non-empty string").nullable().optional(),
 });
 
 export type VariantCreateBody = z.infer<typeof variantCreateBodySchema>;

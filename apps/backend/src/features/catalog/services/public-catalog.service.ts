@@ -37,11 +37,17 @@ export type PublicVariant = {
   sku: string;
   size: string;
   color: string;
+  // Hex from the grounded ColorOption lookup; null while a legacy variant has
+  // no linked option (transition period — free-text color stays authoritative).
+  colorHex: string | null;
   price: number;
   available: boolean;
 };
 
 export type PublicProductDetail = PublicProductListItem & {
+  // Storefront needs the product's category (e.g. related-items rail) without
+  // a second lookup; slug is the public lookup key for catalog reads.
+  categorySlug: string;
   variants: PublicVariant[];
 };
 
@@ -55,11 +61,16 @@ export type PublicCollection = {
 export type PublicCollectionVariant = PublicVariant & {
   productId: string;
   productName: string;
+  // Members link to /products/<slug>; slugs are the public lookup key.
+  productSlug: string;
 };
 
 export type PublicCollectionDetail = PublicCollection & {
   variants: PublicCollectionVariant[];
   banner: PublicImageSlot | null;
+  // Storefront card grid: one summary per distinct published member product,
+  // in membership first-seen order. Same shape as /api/products list items.
+  products: PublicProductListItem[];
 };
 
 type ImageRowRef = {
@@ -120,7 +131,11 @@ export async function listPublicProducts(params: {
     categoryId = categoryRow.id;
   }
 
-  const where = categoryId ? { categoryId } : undefined;
+  const where = {
+    // Storefront reads are published-only; drafts/archived never surface here.
+    status: "PUBLISHED" as const,
+    ...(categoryId !== undefined && { categoryId }),
+  };
 
   const [products, total] = await Promise.all([
     prisma.product.findMany({
@@ -164,16 +179,27 @@ export async function getPublicProduct(params: {
 }): Promise<PublicProductDetail> {
   const { slug, prisma } = params;
 
-  const product = await prisma.product.findUnique({
-    where: { slug },
+  // Slug is not unique-filtered here because drafts must be unreachable: a
+  // draft and a nonexistent product produce the identical 404 below.
+  const product = await prisma.product.findFirst({
+    where: { slug, status: "PUBLISHED" },
     select: {
       id: true,
       name: true,
       slug: true,
       description: true,
+      category: { select: { slug: true } },
       variants: {
-        select: { id: true, sku: true, size: true, color: true, price: true, stock: true },
-        orderBy: { createdAt: "asc" },
+        select: {
+          id: true,
+          sku: true,
+          size: true,
+          color: true,
+          colorOption: { select: { hex: true } },
+          price: true,
+          stock: true,
+        },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
       },
       images: {
         select: { key: true, alt: true },
@@ -186,9 +212,10 @@ export async function getPublicProduct(params: {
     throw new CatalogError("PRODUCT_NOT_FOUND", "Product not found", 404);
   }
 
-  const { variants, images, ...base } = product;
+  const { variants, images, category, ...base } = product;
   return {
     ...base,
+    categorySlug: category.slug,
     ...priceRange(variants.map((variant) => variant.price)),
     images: images.map(toPublicImage),
     variants: variants.map(toPublicVariant),
@@ -242,9 +269,25 @@ export async function getPublicCollection(params: {
               sku: true,
               size: true,
               color: true,
+              colorOption: { select: { hex: true } },
               price: true,
               stock: true,
-              product: { select: { id: true, name: true } },
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  description: true,
+                  status: true,
+                  // Full image/variant sets so card summaries are computed
+                  // from the same data as /api/products list items.
+                  images: {
+                    select: { key: true, alt: true },
+                    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+                  },
+                  variants: { select: { price: true } },
+                },
+              },
             },
           },
         },
@@ -258,13 +301,37 @@ export async function getPublicCollection(params: {
 
   const { variants, images, ...base } = collection;
   const bannerImage = images[0];
+
+  // Read-model grouping lives in the service: member variants are the unit of
+  // membership, cards are distinct products in first-seen order. Draft or
+  // archived products never surface as cards, even via a stale membership.
+  const products = new Map<string, PublicProductListItem>();
+  for (const membership of variants) {
+    const product = membership.variant.product;
+    if (product.status !== "PUBLISHED" || products.has(product.id)) {
+      continue;
+    }
+    // Card prices span the product's FULL variant set so priceMin matches
+    // /api/products exactly — not just the variants this collection contains.
+    products.set(product.id, {
+      id: product.id,
+      name: product.name,
+      slug: product.slug,
+      description: product.description,
+      ...priceRange(product.variants.map((variant) => variant.price)),
+      images: product.images.map(toPublicImage),
+    });
+  }
+
   return {
     ...base,
     banner: bannerImage ? toPublicImage(bannerImage) : null,
+    products: [...products.values()],
     variants: variants.map((membership) => ({
       ...toPublicVariant(membership.variant),
       productId: membership.variant.product.id,
       productName: membership.variant.product.name,
+      productSlug: membership.variant.product.slug,
     })),
   };
 }
@@ -281,6 +348,7 @@ function toPublicVariant(variant: {
   sku: string;
   size: string;
   color: string;
+  colorOption?: { hex: string } | null;
   price: number;
   stock: number;
 }): PublicVariant {
@@ -289,6 +357,7 @@ function toPublicVariant(variant: {
     sku: variant.sku,
     size: variant.size,
     color: variant.color,
+    colorHex: variant.colorOption?.hex ?? null,
     price: variant.price,
     available: variant.stock > 0,
   };

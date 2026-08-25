@@ -80,12 +80,19 @@ model Collection {
   images   Image[]
 }
 
+enum ProductStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model Product {
-  id          String   @id @default(cuid(2))
+  id          String        @id @default(cuid(2))
   name        String
   description String?
-  slug        String   @unique
+  slug        String        @unique
   categoryId  String
+  status      ProductStatus @default(DRAFT)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -98,24 +105,39 @@ model Product {
   @@index([slug])
 }
 
+model ColorOption {
+  id   String @id @default(cuid(2))
+  name String @unique
+  hex  String @db.Char(7)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants Variant[]
+}
+
 model Variant {
   id        String @id @default(cuid(2))
   sku       String @unique
   size      String
   color     String
+  colorId   String?
   price     Int
   stock     Int    @default(0)
+  sortOrder Int    @default(0)
   productId String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product     Product             @relation(fields: [productId], references: [id])
+  product     Product      @relation(fields: [productId], references: [id])
+  colorOption ColorOption? @relation(fields: [colorId], references: [id])
   collections VariantCollection[]
   images      Image[]
   cartItems   CartItem[]
 
   @@index([productId])
+  @@index([colorId])
 }
 
 model VariantCollection {

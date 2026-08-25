@@ -7,6 +7,7 @@ const mockProduct = {
   description: null,
   slug: "basic-tee",
   categoryId: "cat-1",
+  status: "PUBLISHED",
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -130,6 +131,37 @@ describe("product controller — createHandler", () => {
 
     expect(res.statusCode).toBe(409);
   });
+
+  it("returns 422 for an invalid status value", async () => {
+    const prisma = createMockPrisma();
+    const controller = createProductController(prisma);
+    const req = createMockReq({ name: "Tee", slug: "tee", categoryId: "cat-1", status: "HIDDEN" });
+    const res = createMockRes();
+
+    await controller.createHandler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ code: "VALIDATION_ERROR" }),
+      }),
+    );
+  });
+
+  it("accepts an explicit valid status on create", async () => {
+    const prisma = createMockPrisma();
+    const controller = createProductController(prisma);
+    const req = createMockReq({ name: "Tee", slug: "tee", categoryId: "cat-1", status: "PUBLISHED" });
+    const res = createMockRes();
+
+    await controller.createHandler(req, res);
+
+    expect(res.statusCode).toBe(201);
+    expect(prisma.product.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ status: "PUBLISHED" }),
+    });
+  });
 });
 
 describe("product controller — listHandler", () => {
@@ -162,6 +194,31 @@ describe("product controller — listHandler", () => {
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { categoryId: "cat-1" } }),
     );
+  });
+
+  it("passes status filter to service", async () => {
+    const prisma = createMockPrisma();
+    const controller = createProductController(prisma);
+    const req = createMockReq(undefined, undefined, { page: "1", limit: "20", status: "DRAFT" });
+    const res = createMockRes();
+
+    await controller.listHandler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: "DRAFT" } }),
+    );
+  });
+
+  it("returns 422 for an invalid status filter", async () => {
+    const prisma = createMockPrisma();
+    const controller = createProductController(prisma);
+    const req = createMockReq(undefined, undefined, { page: "1", limit: "20", status: "VISIBLE" });
+    const res = createMockRes();
+
+    await controller.listHandler(req, res);
+
+    expect(res.statusCode).toBe(422);
   });
 });
 
@@ -227,6 +284,17 @@ describe("product controller — updateHandler", () => {
     await controller.updateHandler(req, res);
 
     expect(res.statusCode).toBe(400);
+  });
+
+  it("returns 422 for an invalid status transition value", async () => {
+    const prisma = createMockPrisma();
+    const controller = createProductController(prisma);
+    const req = createMockReq({ status: "RETIRED" }, { id: "prod-1" });
+    const res = createMockRes();
+
+    await controller.updateHandler(req, res);
+
+    expect(res.statusCode).toBe(422);
   });
 });
 

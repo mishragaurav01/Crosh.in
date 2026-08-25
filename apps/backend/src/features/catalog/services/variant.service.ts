@@ -9,18 +9,23 @@ export async function createVariant(params: {
   color: string;
   price: number;
   stock: number;
+  colorId?: string | null;
   prisma: PrismaClient;
-}): Promise<{ id: string; sku: string; size: string; color: string; price: number; stock: number; productId: string; createdAt: Date; updatedAt: Date }> {
-  const { productId, sku, size, color, price, stock, prisma } = params;
+}): Promise<{ id: string; sku: string; size: string; color: string; colorId: string | null; price: number; stock: number; productId: string; createdAt: Date; updatedAt: Date }> {
+  const { productId, sku, size, color, price, stock, colorId, prisma } = params;
 
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
     throw new CatalogError("INVALID_PRODUCT", "Product does not exist", 400);
   }
 
+  if (colorId !== undefined && colorId !== null) {
+    await requireColorOption(colorId, prisma);
+  }
+
   try {
     return await prisma.variant.create({
-      data: { sku, size, color, price, stock, productId },
+      data: { sku, size, color, price, stock, productId, ...(colorId !== undefined && { colorId }) },
     });
   } catch (error: unknown) {
     if (isPrismaUniqueConstraintError(error)) {
@@ -81,11 +86,16 @@ export async function updateVariant(params: {
   color?: string;
   price?: number;
   stock?: number;
+  colorId?: string | null;
   prisma: PrismaClient;
-}): Promise<{ id: string; sku: string; size: string; color: string; price: number; stock: number; productId: string; createdAt: Date; updatedAt: Date }> {
-  const { productId, variantId, sku, size, color, price, stock, prisma } = params;
+}): Promise<{ id: string; sku: string; size: string; color: string; colorId: string | null; price: number; stock: number; productId: string; createdAt: Date; updatedAt: Date }> {
+  const { productId, variantId, sku, size, color, price, stock, colorId, prisma } = params;
 
   await getVariant({ productId, variantId, prisma });
+
+  if (colorId !== undefined && colorId !== null) {
+    await requireColorOption(colorId, prisma);
+  }
 
   try {
     return await prisma.variant.update({
@@ -96,6 +106,7 @@ export async function updateVariant(params: {
         ...(color !== undefined && { color }),
         ...(price !== undefined && { price }),
         ...(stock !== undefined && { stock }),
+        ...(colorId !== undefined && { colorId }),
       },
     });
   } catch (error: unknown) {
@@ -133,6 +144,13 @@ async function requireProduct(productId: string, prisma: PrismaClient): Promise<
   const product = await prisma.product.findUnique({ where: { id: productId } });
   if (!product) {
     throw new CatalogError("INVALID_PRODUCT", "Product does not exist", 400);
+  }
+}
+
+async function requireColorOption(colorId: string, prisma: PrismaClient): Promise<void> {
+  const option = await prisma.colorOption.findUnique({ where: { id: colorId } });
+  if (!option) {
+    throw new CatalogError("INVALID_COLOR_OPTION", "Color option does not exist", 400);
   }
 }
 

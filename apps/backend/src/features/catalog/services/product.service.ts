@@ -1,15 +1,28 @@
 import type { PrismaClient } from "db/client";
 import { CatalogError } from "../types/catalog-errors.js";
+import type { ProductStatusValue } from "../schemas/product.schema.js";
 import { deleteImagesForOwner } from "./image.service.js";
+
+type ProductRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  slug: string;
+  categoryId: string;
+  status: ProductStatusValue;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 export async function createProduct(params: {
   name: string;
   description?: string | null;
   slug: string;
   categoryId: string;
+  status?: ProductStatusValue;
   prisma: PrismaClient;
-}): Promise<{ id: string; name: string; description: string | null; slug: string; categoryId: string; createdAt: Date; updatedAt: Date }> {
-  const { name, description, slug, categoryId, prisma } = params;
+}): Promise<ProductRow> {
+  const { name, description, slug, categoryId, status, prisma } = params;
 
   const category = await prisma.category.findUnique({ where: { id: categoryId } });
   if (!category) {
@@ -17,8 +30,9 @@ export async function createProduct(params: {
   }
 
   try {
+    // New products start as drafts so they never surface publicly by accident.
     return await prisma.product.create({
-      data: { name, description: description ?? null, slug, categoryId },
+      data: { name, description: description ?? null, slug, categoryId, status: status ?? "DRAFT" },
     });
   } catch (error: unknown) {
     if (isPrismaUniqueConstraintError(error)) {
@@ -32,12 +46,16 @@ export async function listProducts(params: {
   page: number;
   limit: number;
   categoryId?: string;
+  status?: ProductStatusValue;
   prisma: PrismaClient;
-}): Promise<{ data: Array<{ id: string; name: string; description: string | null; slug: string; categoryId: string; createdAt: Date; updatedAt: Date }>; total: number; page: number; limit: number }> {
-  const { page, limit, categoryId, prisma } = params;
+}): Promise<{ data: ProductRow[]; total: number; page: number; limit: number }> {
+  const { page, limit, categoryId, status, prisma } = params;
   const skip = (page - 1) * limit;
 
-  const where = categoryId ? { categoryId } : undefined;
+  const where = {
+    ...(categoryId !== undefined && { categoryId }),
+    ...(status !== undefined && { status }),
+  };
 
   const [data, total] = await Promise.all([
     prisma.product.findMany({
@@ -55,7 +73,7 @@ export async function listProducts(params: {
 export async function getProduct(params: {
   id: string;
   prisma: PrismaClient;
-}): Promise<{ id: string; name: string; description: string | null; slug: string; categoryId: string; createdAt: Date; updatedAt: Date }> {
+}): Promise<ProductRow> {
   const { id, prisma } = params;
 
   const product = await prisma.product.findUnique({ where: { id } });
@@ -71,9 +89,10 @@ export async function updateProduct(params: {
   description?: string | null;
   slug?: string;
   categoryId?: string;
+  status?: ProductStatusValue;
   prisma: PrismaClient;
-}): Promise<{ id: string; name: string; description: string | null; slug: string; categoryId: string; createdAt: Date; updatedAt: Date }> {
-  const { id, name, description, slug, categoryId, prisma } = params;
+}): Promise<ProductRow> {
+  const { id, name, description, slug, categoryId, status, prisma } = params;
 
   await getProduct({ id, prisma });
 
@@ -92,6 +111,7 @@ export async function updateProduct(params: {
         ...(description !== undefined && { description: description ?? null }),
         ...(slug !== undefined && { slug }),
         ...(categoryId !== undefined && { categoryId }),
+        ...(status !== undefined && { status }),
       },
     });
   } catch (error: unknown) {
