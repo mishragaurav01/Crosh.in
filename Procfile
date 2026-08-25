@@ -1,0 +1,1 @@
+web: cd apps/backend && bun index.ts
