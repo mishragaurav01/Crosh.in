@@ -52,6 +52,16 @@ app.use("/api/categories", createPublicCategoryRoutes(prisma));
 app.use("/api/products", createPublicProductRoutes(prisma));
 app.use("/api/collections", createPublicCollectionRoutes(prisma));
 
+app.get("/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.status(200).json({ success: true, status: "ok" });
+  } catch (error) {
+    console.error("[health] database check failed", error);
+    res.status(503).json({ success: false, status: "unavailable" });
+  }
+});
+
 const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   console.error("[unhandled]", err);
   res.status(500).json({
