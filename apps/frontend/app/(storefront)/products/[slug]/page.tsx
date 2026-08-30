@@ -10,7 +10,7 @@ import type {
   ProductListItemDto,
 } from "@/app/features/storefront/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 const RELATED_LIMIT = 6;
 

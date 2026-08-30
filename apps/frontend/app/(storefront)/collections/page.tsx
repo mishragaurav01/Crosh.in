@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { api, PaginatedData } from "@/lib/api";
 import type { CollectionListItemDto } from "@/app/features/storefront/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Collections | Crosh.in",

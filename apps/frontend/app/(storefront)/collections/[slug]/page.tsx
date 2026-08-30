@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import ProductCard from "@/app/features/storefront/components/product-card";
 import type { CollectionDetailDto } from "@/app/features/storefront/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 interface CollectionPageProps {
   params: Promise<{ slug: string }>;
