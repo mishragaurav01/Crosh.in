@@ -11,7 +11,7 @@ import type {
   ProductListItemDto,
 } from "@/app/features/storefront/types";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 60;
 
 export default async function HomePage() {
   const [bestsellers, collections] = await Promise.all([
