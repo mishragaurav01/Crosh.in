@@ -3,7 +3,7 @@
 ## Prerequisites
 
 1. **Neon PostgreSQL** - Your database is already set up
-2. **Vercel Account** - For frontend deployment
+2. **Netlify Account** - For frontend deployment
 3. **Railway/Render Account** - For backend deployment
 
 ---
@@ -34,7 +34,7 @@ RESEND_API_KEY=re_xxx
 EMAIL_FROM=Crosh <onboarding@resend.dev>
 ```
 
-### Frontend (Vercel)
+### Frontend (Netlify)
 
 ```bash
 NEXT_PUBLIC_API_URL=https://crosh-in.onrender.com
@@ -65,13 +65,18 @@ bunx prisma migrate deploy
 3. Use the provided `render.yaml`
 4. Set environment variables
 
-### 3. Frontend Deployment (Vercel)
+### 3. Frontend Deployment (Netlify)
 
 1. Push to GitHub
-2. Import repo to Vercel
-3. Set root directory to `apps/frontend`
+2. Import repo to Netlify
+3. Set base directory to `apps/frontend` (framework preset: Next.js, using
+   `@netlify/plugin-nextjs`)
 4. Set `NEXT_PUBLIC_API_URL` environment variable
 5. Deploy
+
+> Next.js 16 deploys to Netlify via the Next runtime adapter. Do NOT use
+> `output: "standalone"` — the `.next` output convention differs on Netlify
+> (see commit `8fc4702`).
 
 ---
 

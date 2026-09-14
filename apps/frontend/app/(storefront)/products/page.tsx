@@ -2,9 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { api, PaginatedData } from "@/lib/api";
+import CatalogGrid from "@/app/features/storefront/components/catalog-grid";
 import FilterSidebar from "@/app/features/storefront/components/filter-sidebar";
-import Pagination from "@/app/features/storefront/components/pagination";
-import ProductCard from "@/app/features/storefront/components/product-card";
 import type {
   CategoryListItemDto,
   ProductListItemDto,
@@ -61,8 +60,9 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
     throw error;
   }
 
-  // Load More model: ?page=N means "highest loaded page". Slices 2..N are
-  // appended server-side so the grid grows while the URL stays canonical.
+  // ?page=N means "highest loaded page". For deep links where N > 1 the
+  // server still appends slices 2..N so the grid starts already-loaded; the
+  // client CatalogGrid then continues one page per Load More click (T3).
   const totalPages =
     firstSlice.total > 0 ? Math.ceil(firstSlice.total / PAGE_LIMIT) : 0;
   const currentPage = Math.min(requestedPage, Math.max(totalPages, 1));
@@ -85,20 +85,6 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const activeCategory = category
     ? categories.data.find((entry) => entry.slug === category)
     : undefined;
-
-  function buildPageHref(page: number): string {
-    const search = new URLSearchParams();
-    if (category) {
-      search.set("category", category);
-    }
-    if (page > 1) {
-      search.set("page", String(page));
-    }
-    const query = search.toString();
-    return query ? `/products?${query}` : "/products";
-  }
-
-  const hasNextPage = currentPage < totalPages;
 
   return (
     <div className="flex flex-col md:flex-row gap-xxl pb-32 pt-md px-container-margin">
@@ -154,33 +140,13 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
             )}
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-xl">
-              {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
-              ))}
-
-              {/* Additional Decorative Row for visual weight (per reference) */}
-              <div className="col-span-full py-xxl text-center">
-                <p className="text-body-md text-on-surface-variant max-w-[36rem] mx-auto opacity-70">
-                  Our artisans dedicate over 20 hours of hand-weaving to every
-                  large tote. Each piece is unique, reflecting the individual
-                  tension and rhythm of the weaver.
-                </p>
-                <div className="mt-lg flex justify-center gap-sm">
-                  <span className="w-3 h-3 rounded-full bg-primary" />
-                  <span className="w-3 h-3 rounded-full bg-primary-container" />
-                  <span className="w-3 h-3 rounded-full bg-primary-container" />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-xl">
-              <Pagination
-                nextHref={hasNextPage ? buildPageHref(currentPage + 1) : null}
-              />
-            </div>
-          </>
+          <CatalogGrid
+            initialProducts={products}
+            total={firstSlice.total}
+            pageSize={PAGE_LIMIT}
+            category={category}
+            startPage={currentPage}
+          />
         )}
       </section>
     </div>
