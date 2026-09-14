@@ -37,7 +37,7 @@ EMAIL_FROM=Crosh <onboarding@resend.dev>
 ### Frontend (Vercel)
 
 ```bash
-NEXT_PUBLIC_API_URL=https://your-backend.up.railway.app
+NEXT_PUBLIC_API_URL=https://crosh-in.onrender.com
 ```
 
 ---
@@ -81,6 +81,30 @@ bunx prisma migrate deploy
 2. Test API endpoints
 3. Verify image uploads work
 4. Test authentication flow
+
+---
+
+## Keep-Alive (Render Backend)
+
+Render's free tier spins the service down after ~15 minutes of inactivity,
+causing a cold start on the next request. We keep it awake with an external
+cron scheduler hitting the health endpoint — **not** GitHub Actions (its
+`scheduled` runs are best-effort and unreliable at sub-hour cadences).
+
+**Setup (cron-job.org):**
+
+1. Create a free account at https://cron-job.org
+2. Create a new cron job:
+   - **URL:** `https://crosh-in.onrender.com/health` (GET; see
+     `apps/backend/index.ts` for the endpoint)
+   - **Schedule:** every 10 minutes
+   - **Notifications:** enable failure email (and recovery) to be alerted on
+     outage
+3. Run a test execution and confirm the execution history fills every ~10 min.
+4. Verify in the Render dashboard that the service stops spinning down.
+
+**Health endpoint**: `GET /health` at `apps/backend/index.ts`. Keep it
+dependency-free (no DB/auth) so it represents the process being up, cheaply.
 
 ---
 
